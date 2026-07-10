@@ -98,6 +98,9 @@ DLVARFIXUP __bgdexport(libmod_3d, locals_fixup)[] = {
     { "intensity" , NULL, -1, -1 },
     { "range"     , NULL, -1, -1 },
     { "cone_angle", NULL, -1, -1 },
+    { "color_r"   , NULL, -1, -1 },
+    { "color_g"   , NULL, -1, -1 },
+    { "color_b"   , NULL, -1, -1 },
     { NULL        , NULL, -1, -1 }
 };
 
@@ -256,30 +259,51 @@ int64_t g3d_entity_set_parent_bgd(INSTANCE *my, int64_t *params) {
 /* Camera wrappers - backed by a small camera pool */
 #define G3D_MAX_BGD_CAMERAS 16
 static G3DCamera *g_bgd_cameras[G3D_MAX_BGD_CAMERAS] = {0};
-static int g_bgd_camera_count = 0;
+static int g_bgd_camera_count = 0;   /* high-water mark */
+static int g_bgd_camera_next  = 0;   /* circular hint */
 
 static G3DCamera *g3d_bgd_camera_get(int id) {
-    if (id < 0 || id >= g_bgd_camera_count)
+    if (id < 1 || id > G3D_MAX_BGD_CAMERAS)
         return NULL;
-    return g_bgd_cameras[id];
+    /* slot must be occupied (not freed) */
+    return g_bgd_cameras[id - 1];  /* NULL if freed */
 }
 
 int64_t g3d_camera_create_bgd(INSTANCE *my, int64_t *params) {
     g3d_ensure_init();
-    if (g_bgd_camera_count >= G3D_MAX_BGD_CAMERAS)
-        return -1;
+
+    /* Circular next-fit: start from g_bgd_camera_next, wrap, try at most MAX slots */
+    int id = -1;
+    for (int i = 0; i < G3D_MAX_BGD_CAMERAS; i++) {
+        int candidate = (g_bgd_camera_next + i) % G3D_MAX_BGD_CAMERAS;
+        if (!g_bgd_cameras[candidate]) {
+            id = candidate;
+            break;
+        }
+    }
+    if (id < 0) {
+        fprintf(stderr, "G3D: Max cameras reached\n");
+        return 0;
+    }
 
     G3DCamera *cam = g3d_camera_impl_create(G3D_CAMERA_PERSPECTIVE);
     if (!cam)
-        return -1;
+        return 0;
 
     /* Sensible default perspective (aspect 16:9, 60 deg FOV) */
     g3d_camera_set_perspective(cam, 60.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
     g3d_camera_set_position_impl(cam, vec3_make(0, 0, 0));
 
-    int id = g_bgd_camera_count++;
     g_bgd_cameras[id] = cam;
-    return id;
+
+    /* Advance hint past the slot we just took */
+    g_bgd_camera_next = (id + 1) % G3D_MAX_BGD_CAMERAS;
+
+    /* Extend high-water mark if using a new slot */
+    if (id >= g_bgd_camera_count)
+        g_bgd_camera_count = id + 1;
+
+    return id + 1;  /* 1-based public ID */
 }
 
 int64_t g3d_camera_set_active_bgd(INSTANCE *my, int64_t *params) {
@@ -315,7 +339,20 @@ int64_t g3d_camera_look_at_bgd(INSTANCE *my, int64_t *params) {
     return 1;
 }
 
-int64_t g3d_camera_free_bgd(INSTANCE *my, int64_t *params) { return 1; }
+int64_t g3d_camera_free_bgd(INSTANCE *my, int64_t *params) {
+    int id = (int)params[0];
+    if (id < 1 || id > G3D_MAX_BGD_CAMERAS)
+        return 0;
+    G3DCamera *cam = g_bgd_cameras[id - 1];
+    if (!cam)
+        return 0;
+    g3d_camera_free(cam);
+    g_bgd_cameras[id - 1] = NULL;
+    /* Shrink high-water mark if we freed a tail slot */
+    while (g_bgd_camera_count > 0 && !g_bgd_cameras[g_bgd_camera_count - 1])
+        g_bgd_camera_count--;
+    return 1;
+}
 int64_t g3d_camera_update_bgd(INSTANCE *my, int64_t *params) {
     G3DCamera *cam = g3d_bgd_camera_get((int)params[0]);
     if (!cam)
@@ -1632,7 +1669,7 @@ static void g3d_process_instance_hook( INSTANCE * i ) {
     float rz = G3D_MD2RAD( LOCDOUBLE( libmod_3d, i, LOC3D_ANGLE_Z ) );
 
     /* Scale — same priority logic as 2D: scale_x/y/z > size_x/size_y > size */
-    double size = LOCDOUBLE( libmod_3d, i, LOC3D_SIZE );  /* "size"   */
+    double size = LOCDOUBLE( libmod_3d, i, LOC3D_SIZE );
     double sx = LOCDOUBLE( libmod_3d, i, LOC3D_SIZE_X );
     double sy = LOCDOUBLE( libmod_3d, i, LOC3D_SIZE_Y );
     double sz = LOCDOUBLE( libmod_3d, i, LOC3D_SIZE_Z );
@@ -1684,9 +1721,19 @@ static void g3d_process_instance_hook( INSTANCE * i ) {
             G3DCamera *cam = g3d_bgd_camera_get( entity_id );
             if ( cam ) {
                 g3d_camera_set_position_impl( cam, vec3_make( px, py, pz ) );
-                g3d_camera_look_at_impl( cam, vec3_make( tx, ty, tz ), vec3_make( 0.0f, 1.0f, 0.0f ) );
+
+                /* Only call look_at when target is different from position to avoid
+                   a zero-length direction vector which produces a degenerate view matrix */
+                float ddx = tx - px;
+                float ddy = ty - py;
+                float ddz = tz - pz;
+                float dist2 = ddx*ddx + ddy*ddy + ddz*ddz;
+                if ( dist2 > 1e-10f ) {
+                    g3d_camera_look_at_impl( cam, vec3_make( tx, ty, tz ), vec3_make( 0.0f, 1.0f, 0.0f ) );
+                }
 
                 float fov = (float) LOCDOUBLE( libmod_3d, i, LOC3D_FOV );
+                if (fov <= 0.0f) fov = 60.0f;
                 g3d_camera_set_perspective( cam, fov, 16.0f / 9.0f, 0.1f, 1000.0f );
             }
             break;

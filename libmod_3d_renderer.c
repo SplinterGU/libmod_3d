@@ -1201,9 +1201,9 @@ void g3d_renderer_end_frame(void) {
 
 #ifndef VITA
     /* Stats */
-    printf("G3D: Draw calls: %u, Triangles: %u, Culled: %u\n",
-           g_renderer.draw_calls, g_renderer.triangles_rendered,
-           g_renderer.entities_culled);
+    //printf("G3D: Draw calls: %u, Triangles: %u, Culled: %u\n",
+    //       g_renderer.draw_calls, g_renderer.triangles_rendered,
+    //       g_renderer.entities_culled);
 
     /* Disable depth testing */
     glDisable(GL_DEPTH_TEST);

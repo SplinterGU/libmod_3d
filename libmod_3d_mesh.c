@@ -62,8 +62,7 @@ G3DMesh *g3d_mesh_create(const char *name, G3DVertex *vertices,
     /* Calculate bounds */
     g3d_mesh_calculate_bounds(mesh);
 
-    printf("G3D: Mesh created: %s (%u vertices, %u indices)\n", name,
-           vertex_count, index_count);
+//    printf("G3D: Mesh created: %s (%u vertices, %u indices)\n", name, vertex_count, index_count);
 
     return mesh;
 }
@@ -147,8 +146,7 @@ int g3d_mesh_upload_gpu(G3DMesh *mesh) {
 
     mesh->gpu_uploaded = 1;
 
-    printf("G3D: Mesh uploaded to GPU (VAO=%u, VBO=%u, EBO=%u)\n", mesh->vao,
-           mesh->vbo, mesh->ebo);
+//    printf("G3D: Mesh uploaded to GPU (VAO=%u, VBO=%u, EBO=%u)\n", mesh->vao, mesh->vbo, mesh->ebo);
 
     return 1;
 #else

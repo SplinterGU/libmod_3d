@@ -9,16 +9,34 @@
 #include <string.h>
 #include <math.h>
 
-static G3DLight g_lights[32];
-static int g_light_count = 0;
+#define G3D_MAX_LIGHTS 32
+
+static G3DLight g_lights[G3D_MAX_LIGHTS];
+static int g_light_count = 0;   /* high-water mark for get_all / shutdown */
+static int g_light_next  = 0;   /* circular hint: where to start looking next */
 
 int g3d_light_impl_create(int type, float r, float g, float b) {
-    if (g_light_count >= 32) {
+    /* Circular next-fit: start from g_light_next, wrap around, try at most MAX slots */
+    int light_id = -1;
+    for (int i = 0; i < G3D_MAX_LIGHTS; i++) {
+        int candidate = (g_light_next + i) % G3D_MAX_LIGHTS;
+        if (!g_lights[candidate].active) {
+            light_id = candidate;
+            break;
+        }
+    }
+    if (light_id < 0) {
         fprintf(stderr, "G3D: Max lights reached\n");
-        return -1;
+        return 0;
     }
 
-    int light_id = g_light_count++;
+    /* Advance hint past the slot we just took */
+    g_light_next = (light_id + 1) % G3D_MAX_LIGHTS;
+
+    /* Extend high-water mark if we're using a new slot */
+    if (light_id >= g_light_count)
+        g_light_count = light_id + 1;
+
     G3DLight *light = &g_lights[light_id];
 
     memset(light, 0, sizeof(G3DLight));
@@ -41,21 +59,23 @@ int g3d_light_impl_create(int type, float r, float g, float b) {
     /* Direction defaults to down */
     light->direction = vec3_make(0, -1, 0);
 
-    /* Add to active scene if one exists */
+    /* Add to active scene if one exists.
+       NOTE: g3d_light_impl_get() expects 1-based IDs (it does g_lights[id-1]),
+       so we store light_id+1 in the scene so the renderer can look it up. */
     int active_scene = g3d_scene_impl_get_active();
     if (active_scene >= 0) {
-        g3d_scene_impl_add_light(active_scene, light_id);
+        g3d_scene_impl_add_light(active_scene, light_id + 1);
     }
 
-    printf("G3D: Light created: id=%d, type=%d\n", light_id, type);
-    return light_id;
+    printf("G3D: Light created: id=%d, type=%d\n", light_id + 1, type);
+    return light_id + 1;
 }
 
 int g3d_light_impl_destroy(int light_id) {
-    if (light_id < 0 || light_id >= g_light_count)
+    if (light_id < 1 || light_id > g_light_count)
         return 0;
 
-    G3DLight *light = &g_lights[light_id];
+    G3DLight *light = &g_lights[light_id - 1];
 
     if (!light->active)
         return 0;
@@ -69,15 +89,21 @@ int g3d_light_impl_destroy(int light_id) {
     }
 
     light->active = 0;
+
+    /* Shrink high-water mark if we freed a tail slot */
+    while (g_light_count > 0 && !g_lights[g_light_count - 1].active)
+        g_light_count--;
+
     printf("G3D: Light destroyed: id=%d\n", light_id);
     return 1;
 }
 
 G3DLight *g3d_light_impl_get(int light_id) {
-    if (light_id < 0 || light_id >= g_light_count)
+    /* light_id is 1-based; valid range is 1..MAX */
+    if (light_id < 1 || light_id > G3D_MAX_LIGHTS)
         return NULL;
 
-    G3DLight *light = &g_lights[light_id];
+    G3DLight *light = &g_lights[light_id - 1];
     if (!light->active)
         return NULL;
 
@@ -167,7 +193,7 @@ int g3d_light_impl_set_shadow_quality(int light_id, int resolution) {
 }
 
 int *g3d_light_impl_get_all(int *count) {
-    static int light_ids[32];
+    static int light_ids[G3D_MAX_LIGHTS];
     int idx = 0;
 
     for (int i = 0; i < g_light_count; i++) {
