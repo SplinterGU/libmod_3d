@@ -1601,6 +1601,16 @@ int64_t g3d_rigidbody_x_bgd(INSTANCE *my, int64_t *params) { float v = g3d_rigid
 int64_t g3d_rigidbody_y_bgd(INSTANCE *my, int64_t *params) { float v = g3d_rigidbody_y((int)params[0]); return (int64_t) * (int32_t *)&v; }
 int64_t g3d_rigidbody_z_bgd(INSTANCE *my, int64_t *params) { float v = g3d_rigidbody_z((int)params[0]); return (int64_t) * (int32_t *)&v; }
 int64_t g3d_rigidbody_grounded_bgd(INSTANCE *my, int64_t *params) { return g3d_rigidbody_grounded((int)params[0]); }
+int64_t g3d_rigidbody_set_angular_velocity_bgd(INSTANCE *my, int64_t *params) {
+    g3d_rigidbody_set_angular_velocity((int)params[0], *(float *)&params[1], *(float *)&params[2], *(float *)&params[3]);
+    return 1;
+}
+int64_t g3d_rigidbody_angle_x_bgd(INSTANCE *my, int64_t *params) { float v = G3D_RAD2MD(g3d_rigidbody_angle_x((int)params[0])); return (int64_t) * (int32_t *)&v; }
+int64_t g3d_rigidbody_angle_y_bgd(INSTANCE *my, int64_t *params) { float v = G3D_RAD2MD(g3d_rigidbody_angle_y((int)params[0])); return (int64_t) * (int32_t *)&v; }
+int64_t g3d_rigidbody_angle_z_bgd(INSTANCE *my, int64_t *params) { float v = G3D_RAD2MD(g3d_rigidbody_angle_z((int)params[0])); return (int64_t) * (int32_t *)&v; }
+int64_t g3d_rigidbody_render_x_bgd(INSTANCE *my, int64_t *params) { float v = g3d_rigidbody_render_x((int)params[0]); return (int64_t) * (int32_t *)&v; }
+int64_t g3d_rigidbody_render_y_bgd(INSTANCE *my, int64_t *params) { float v = g3d_rigidbody_render_y((int)params[0]); return (int64_t) * (int32_t *)&v; }
+int64_t g3d_rigidbody_render_z_bgd(INSTANCE *my, int64_t *params) { float v = g3d_rigidbody_render_z((int)params[0]); return (int64_t) * (int32_t *)&v; }
 
 
 static int g3d_object_info(void *what, REGION *clip, int64_t *key, int64_t *ready) {

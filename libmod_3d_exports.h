@@ -266,6 +266,13 @@ int64_t g3d_rigidbody_x_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_rigidbody_y_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_rigidbody_z_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_rigidbody_grounded_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_rigidbody_set_angular_velocity_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_rigidbody_angle_x_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_rigidbody_angle_y_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_rigidbody_angle_z_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_rigidbody_render_x_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_rigidbody_render_y_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_rigidbody_render_z_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_entity_set_mesh_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_material_set_texture_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_material_set_map_bgd(INSTANCE *my, int64_t *params);
@@ -380,6 +387,13 @@ DLSYSFUNCS __bgdexport(libmod_3d, functions_exports)[] = {
     FUNC("G3D_RIGIDBODY_Y", "I", TYPE_FLOAT, g3d_rigidbody_y_bgd),
     FUNC("G3D_RIGIDBODY_Z", "I", TYPE_FLOAT, g3d_rigidbody_z_bgd),
     FUNC("G3D_RIGIDBODY_GROUNDED", "I", TYPE_INT, g3d_rigidbody_grounded_bgd),
+    FUNC("G3D_RIGIDBODY_SET_ANGULAR_VELOCITY", "IFFF", TYPE_INT, g3d_rigidbody_set_angular_velocity_bgd),
+    FUNC("G3D_RIGIDBODY_ANGLE_X", "I", TYPE_FLOAT, g3d_rigidbody_angle_x_bgd),
+    FUNC("G3D_RIGIDBODY_ANGLE_Y", "I", TYPE_FLOAT, g3d_rigidbody_angle_y_bgd),
+    FUNC("G3D_RIGIDBODY_ANGLE_Z", "I", TYPE_FLOAT, g3d_rigidbody_angle_z_bgd),
+    FUNC("G3D_RIGIDBODY_RENDER_X", "I", TYPE_FLOAT, g3d_rigidbody_render_x_bgd),
+    FUNC("G3D_RIGIDBODY_RENDER_Y", "I", TYPE_FLOAT, g3d_rigidbody_render_y_bgd),
+    FUNC("G3D_RIGIDBODY_RENDER_Z", "I", TYPE_FLOAT, g3d_rigidbody_render_z_bgd),
     FUNC("G3D_SKY_SET_TEXTURE", "I", TYPE_INT, g3d_sky_set_texture_bgd),
     FUNC("G3D_SKY_ENABLE", "I", TYPE_INT, g3d_sky_set_enabled_bgd),
     FUNC("G3D_MOUSE_CAPTURE", "I", TYPE_INT, g3d_mouse_capture_bgd),

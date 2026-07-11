@@ -25,12 +25,17 @@ BEGIN
     mdl  = g3d_model_spawn(scene, mbarrel, px, py, pz, 3.0, rand(0, 359) * 1000);
     body = g3d_rigidbody_create(px, py, pz, 1.2, 1.5, 1.2, 6.0);   // caja AABB, masa 6
     g3d_rigidbody_set_velocity(body, ivx, ivy, ivz);
+    // tumbo al lanzar: eje perpendicular a la direccion (las que caen rectas no giran)
+    g3d_rigidbody_set_angular_velocity(body, -ivz * 0.12, 0.0, ivx * 0.12);
 
     LOOP
-        // sincronizar mi modelo con mi cuerpo (el step lo hace main)
-        g3d_entity_set_position(mdl, g3d_rigidbody_x(body),
-                                     g3d_rigidbody_y(body),
-                                     g3d_rigidbody_z(body));
+        // sincronizar posicion Y orientacion con mi cuerpo (el step lo hace main)
+        g3d_entity_set_position(mdl, g3d_rigidbody_render_x(body),
+                                     g3d_rigidbody_render_y(body),
+                                     g3d_rigidbody_render_z(body));
+        g3d_entity_set_rotation(mdl, g3d_rigidbody_angle_x(body),
+                                     g3d_rigidbody_angle_y(body),
+                                     g3d_rigidbody_angle_z(body));
         IF (quit) BREAK; END
         FRAME;
     END
@@ -81,8 +86,6 @@ BEGIN
         IF (ty > 4.0) sz = tz; gy = ty; BREAK; END
     END
 
-    // plataforma estatica (reutiliza el colisionador AABB del character/vehiculo)
-    g3d_collider_add_box(sx - 7.0, gy, sz - 7.0,  sx + 7.0, gy + 2.0, sz + 7.0);
     g3d_physics_set_gravity(24.0);
 
     // torre de cajas que cae y se apila (cada una es un proceso)
@@ -123,7 +126,7 @@ BEGIN
         // ---- lanzar una caja (nuevo proceso) con impulso hacia delante ----
         IF (key(_SPACE) AND ksp == 0)
             crate(camx + fwx * 3.0, camy + fwy * 3.0, camz + fwz * 3.0,
-                  fwx * 45.0, fwy * 45.0 + 6.0, fwz * 45.0);
+                  fwx * 26.0, fwy * 26.0 + 4.0, fwz * 26.0);
         END
         ksp = key(_SPACE);
 

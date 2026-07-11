@@ -103,6 +103,18 @@ float g3d_rigidbody_y(int id);
 float g3d_rigidbody_z(int id);
 int   g3d_rigidbody_grounded(int id);
 
+/* Angular dynamics: bodies tumble freely in the air and settle flat on the
+   ground. Spin is in rad/s; the angle getters return Euler radians. */
+void  g3d_rigidbody_set_angular_velocity(int id, float wx, float wy, float wz);
+float g3d_rigidbody_angle_x(int id);
+float g3d_rigidbody_angle_y(int id);
+float g3d_rigidbody_angle_z(int id);
+/* Model placement for bottom-origin models: centres the model on the body and
+   rotates it about its centre (use these for g3d_entity_set_position). */
+float g3d_rigidbody_render_x(int id);
+float g3d_rigidbody_render_y(int id);
+float g3d_rigidbody_render_z(int id);
+
 #ifdef __cplusplus
 }
 #endif
