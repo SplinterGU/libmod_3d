@@ -23,7 +23,7 @@
 #include <GL/glext.h>
 #endif
 
-#define MAX_GROUPS 16
+#define MAX_GROUPS 256
 
 /* Instanced Phong-ish shader: per-instance model matrix in attribs 3..6,
    directional + ambient light, optional wind sway by object height. */
@@ -244,6 +244,22 @@ int g3d_instances_add(int group, float x, float y, float z,
     gr->count++;
     gr->dirty = 1;
     return gr->count - 1;
+}
+
+/* Update an existing instance in place (no append). Lets one-process-per-object
+   code (BennuGD idiom) own a stable slot for its whole life and just refresh its
+   transform each frame, while still drawing the whole group in one call. */
+void g3d_instances_set(int group, int index, float x, float y, float z,
+                       float yaw_deg, float scale) {
+    if (group < 0 || group >= MAX_GROUPS || !g_inst.g[group].active) return;
+    Group *gr = &g_inst.g[group];
+    if (index < 0 || index >= gr->count) return;
+    Mat4 m = mat4_trs(vec3_make(x, y, z),
+                      quat_from_euler(0.0f, yaw_deg * 3.14159265f / 180.0f, 0.0f),
+                      vec3_make(scale, scale, scale));
+    for (int k = 0; k < 16; k++)
+        gr->mats[index * 16 + k] = m.m[k];
+    gr->dirty = 1;
 }
 
 void g3d_instances_set_wind(int group, float strength) {

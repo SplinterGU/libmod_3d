@@ -158,6 +158,10 @@ int g3d_mesh_upload_gpu(G3DMesh *mesh);
 void g3d_mesh_update_gpu(G3DMesh *mesh);
 void g3d_mesh_update_indices_gpu(G3DMesh *mesh);   /* re-upload the EBO (for terrain holes) */
 
+/* Build a lower-poly copy of a mesh (vertex clustering). grid = cells along the
+   longest axis; smaller = more aggressive. GPU-uploaded. For distance LOD. */
+G3DMesh *g3d_mesh_simplify(const G3DMesh *src, int grid);
+
 /* Free mesh (GPU and CPU memory) */
 void g3d_mesh_free(G3DMesh *mesh);
 

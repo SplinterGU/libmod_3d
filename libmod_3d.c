@@ -555,6 +555,18 @@ int64_t g3d_model_submesh_count_bgd(INSTANCE *my, int64_t *params) {
     return model ? (int64_t)model->mesh_count : 0;
 }
 
+/* Build a simplified LOD copy of a submesh; returns a mesh handle usable in
+   g3d_instances_create (for a distance LOD level). grid: cells along the longest
+   axis (e.g. 10 aggressive .. 24 mild). */
+int64_t g3d_model_submesh_lod_bgd(INSTANCE *my, int64_t *params) {
+    G3DModel *model = (G3DModel *)(intptr_t)params[0];
+    int i = (int)params[1];
+    int grid = (int)params[2];
+    if (!model || i < 0 || i >= (int)model->mesh_count) return -1;
+    G3DMesh *lod = g3d_mesh_simplify(&model->meshes[i], grid);
+    return lod ? (int64_t)(intptr_t)lod : -1;
+}
+
 /* ---- Skeletal animation ---- */
 int64_t g3d_model_anim_count_bgd(INSTANCE *my, int64_t *params) {
     G3DModel *model = (G3DModel *)(intptr_t)params[0];
@@ -1097,6 +1109,12 @@ int64_t g3d_instances_add_bgd(INSTANCE *my, int64_t *params) {
     float yaw = *(float *)&params[4];
     float scale = *(float *)&params[5];
     return (int64_t)g3d_instances_add(group, x, y, z, yaw, scale);
+}
+int64_t g3d_instances_set_bgd(INSTANCE *my, int64_t *params) {
+    g3d_instances_set((int)params[0], (int)params[1], *(float *)&params[2],
+                      *(float *)&params[3], *(float *)&params[4],
+                      *(float *)&params[5], *(float *)&params[6]);
+    return 1;
 }
 
 int64_t g3d_instances_set_wind_bgd(INSTANCE *my, int64_t *params) {

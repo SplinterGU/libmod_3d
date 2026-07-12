@@ -110,6 +110,10 @@ typedef struct {
     float exposure, bloom_threshold, bloom_amount;
     int bloom_enabled, hdr_ready, hdr_active, tonemap_mode;
 
+    /* Half-res volumetric cloud target (the raymarch runs at 1/4 the pixels,
+       then upscales — clouds are low frequency so quality loss is negligible) */
+    uint32_t cloud_fbo, cloud_tex, cloud_w, cloud_h;
+
     /* SSAO (screen-space ambient occlusion), reconstructed from the depth texture */
     uint32_t ssao_fbo, ssao_tex, ssao_blur_fbo, ssao_blur_tex, ssao_noise_tex, ssao_w, ssao_h;
     void *ssao_shader, *ssao_blur_shader;

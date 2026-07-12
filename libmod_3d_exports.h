@@ -170,6 +170,8 @@ int64_t g3d_mirror_clear_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_mirror_set_distance_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_instances_create_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_instances_add_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_instances_set_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_model_submesh_lod_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_instances_set_wind_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_instances_set_distance_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_instances_clear_bgd(INSTANCE *my, int64_t *params);
@@ -458,6 +460,8 @@ DLSYSFUNCS __bgdexport(libmod_3d, functions_exports)[] = {
     FUNC("G3D_MIRROR_SET_DISTANCE", "F", TYPE_INT, g3d_mirror_set_distance_bgd),
     FUNC("G3D_INSTANCES_CREATE", "II", TYPE_INT, g3d_instances_create_bgd),
     FUNC("G3D_INSTANCES_ADD", "IFFFFF", TYPE_INT, g3d_instances_add_bgd),
+    FUNC("G3D_INSTANCES_SET", "IIFFFFF", TYPE_INT, g3d_instances_set_bgd),
+    FUNC("G3D_MODEL_SUBMESH_LOD", "III", TYPE_INT, g3d_model_submesh_lod_bgd),
     FUNC("G3D_INSTANCES_SET_WIND", "IF", TYPE_INT, g3d_instances_set_wind_bgd),
     FUNC("G3D_INSTANCES_SET_DISTANCE", "IF", TYPE_INT, g3d_instances_set_distance_bgd),
     FUNC("G3D_INSTANCES_CLEAR", "I", TYPE_INT, g3d_instances_clear_bgd),

@@ -200,6 +200,98 @@ void g3d_mesh_update_indices_gpu(G3DMesh *mesh) {
 }
 
 /* ============================================================================
+   LOD - MESH SIMPLIFICATION (vertex clustering)
+   ============================================================================
+   Overlay a uniform grid on the mesh AABB, collapse every vertex in a cell to
+   one representative (the average), drop triangles that degenerate. Simple,
+   deterministic, dependency-free; quality is fine for distant LOD. `grid` = the
+   number of cells along the longest axis (smaller = more aggressive). Returns a
+   new GPU-uploaded mesh, or NULL. */
+G3DMesh *g3d_mesh_simplify(const G3DMesh *src, int grid) {
+    if (!src || !src->vertices || src->vertex_count == 0 || src->index_count < 3)
+        return NULL;
+    if (grid < 2)  grid = 2;
+    if (grid > 48) grid = 48;
+
+    float mn[3], mx[3];
+    for (int k = 0; k < 3; k++) { mn[k] = src->aabb_min[k]; mx[k] = src->aabb_max[k]; }
+    float ext[3];
+    float longest = 1e-6f;
+    for (int k = 0; k < 3; k++) { ext[k] = mx[k] - mn[k]; if (ext[k] > longest) longest = ext[k]; }
+    float cell = longest / (float)grid;
+    if (cell < 1e-6f) cell = 1e-6f;
+
+    int gx = (int)(ext[0] / cell) + 1;
+    int gy = (int)(ext[1] / cell) + 1;
+    int gz = (int)(ext[2] / cell) + 1;
+    long ncells = (long)gx * gy * gz;
+
+    int *cellmap = (int *)malloc(sizeof(int) * ncells);           /* cell -> new index */
+    if (!cellmap) return NULL;
+    for (long i = 0; i < ncells; i++) cellmap[i] = -1;
+
+    uint32_t vc = src->vertex_count;
+    uint32_t *remap = (uint32_t *)malloc(sizeof(uint32_t) * vc);   /* old vert -> new index */
+    /* accumulators, at most vc new vertices */
+    double *ax = (double *)calloc(vc, sizeof(double));
+    double *ay = (double *)calloc(vc, sizeof(double));
+    double *az = (double *)calloc(vc, sizeof(double));
+    double *anx = (double *)calloc(vc, sizeof(double));
+    double *any = (double *)calloc(vc, sizeof(double));
+    double *anz = (double *)calloc(vc, sizeof(double));
+    double *au = (double *)calloc(vc, sizeof(double));
+    double *av = (double *)calloc(vc, sizeof(double));
+    int *acnt = (int *)calloc(vc, sizeof(int));
+    if (!remap || !ax || !ay || !az || !anx || !any || !anz || !au || !av || !acnt) {
+        free(cellmap); free(remap); free(ax); free(ay); free(az);
+        free(anx); free(any); free(anz); free(au); free(av); free(acnt); return NULL;
+    }
+
+    uint32_t newv = 0;
+    for (uint32_t v = 0; v < vc; v++) {
+        const G3DVertex *s = &src->vertices[v];
+        int cx = (int)((s->position[0] - mn[0]) / cell); if (cx < 0) cx = 0; if (cx >= gx) cx = gx - 1;
+        int cy = (int)((s->position[1] - mn[1]) / cell); if (cy < 0) cy = 0; if (cy >= gy) cy = gy - 1;
+        int cz = (int)((s->position[2] - mn[2]) / cell); if (cz < 0) cz = 0; if (cz >= gz) cz = gz - 1;
+        long ci = ((long)cz * gy + cy) * gx + cx;
+        int ni = cellmap[ci];
+        if (ni < 0) { ni = (int)newv++; cellmap[ci] = ni; }
+        remap[v] = (uint32_t)ni;
+        ax[ni] += s->position[0]; ay[ni] += s->position[1]; az[ni] += s->position[2];
+        anx[ni] += s->normal[0]; any[ni] += s->normal[1]; anz[ni] += s->normal[2];
+        au[ni] += s->texcoord[0]; av[ni] += s->texcoord[1];
+        acnt[ni]++;
+    }
+
+    G3DVertex *nv = (G3DVertex *)malloc(sizeof(G3DVertex) * newv);
+    for (uint32_t i = 0; i < newv; i++) {
+        float inv = acnt[i] ? 1.0f / acnt[i] : 1.0f;
+        nv[i].position[0] = (float)(ax[i] * inv); nv[i].position[1] = (float)(ay[i] * inv); nv[i].position[2] = (float)(az[i] * inv);
+        float nx = (float)anx[i], ny = (float)any[i], nz = (float)anz[i];
+        float nl = sqrtf(nx*nx + ny*ny + nz*nz); if (nl < 1e-6f) nl = 1.0f;
+        nv[i].normal[0] = nx/nl; nv[i].normal[1] = ny/nl; nv[i].normal[2] = nz/nl;
+        nv[i].texcoord[0] = (float)(au[i] * inv); nv[i].texcoord[1] = (float)(av[i] * inv);
+    }
+
+    uint32_t *ni_idx = (uint32_t *)malloc(sizeof(uint32_t) * src->index_count);
+    uint32_t nic = 0;
+    for (uint32_t i = 0; i + 2 < src->index_count; i += 3) {
+        uint32_t a = remap[src->indices[i]], b = remap[src->indices[i+1]], c = remap[src->indices[i+2]];
+        if (a != b && b != c && a != c) { ni_idx[nic++] = a; ni_idx[nic++] = b; ni_idx[nic++] = c; }
+    }
+
+    free(cellmap); free(remap);
+    free(ax); free(ay); free(az); free(anx); free(any); free(anz); free(au); free(av); free(acnt);
+
+    G3DMesh *out = NULL;
+    if (newv > 0 && nic >= 3)
+        out = g3d_mesh_create("lod", nv, newv, ni_idx, nic);
+    free(nv); free(ni_idx);
+    if (out) g3d_mesh_upload_gpu(out);
+    return out;
+}
+
+/* ============================================================================
    CLEANUP
    ============================================================================
  */

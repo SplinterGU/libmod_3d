@@ -25,6 +25,10 @@ int g3d_instances_create(void *mesh, void *texture);
 int g3d_instances_add(int group, float x, float y, float z,
                       float yaw_deg, float scale);
 
+/* Update instance `index` in place (own a stable slot per process). */
+void g3d_instances_set(int group, int index, float x, float y, float z,
+                       float yaw_deg, float scale);
+
 void g3d_instances_set_wind(int group, float strength);
 void g3d_instances_set_distance(int group, float dist);
 void g3d_instances_clear(int group);

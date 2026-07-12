@@ -982,14 +982,40 @@ static const char *cloud_frag =
     "  F = vec4(scat, T);\n"                 /* blend GL_ONE, GL_SRC_ALPHA -> dst*T + scat */
     "}\n";
 
+/* Upscale composite: samples the half-res (scat,T) target; the GL_ONE,GL_SRC_ALPHA
+   blend then does dst*T + scat, identical to the full-res path. */
+static const char *cloud_composite_frag =
+    "#version 330 core\n"
+    "in vec2 vUV; out vec4 F;\n"
+    "uniform sampler2D uClouds;\n"
+    "void main(){ F = texture(uClouds, vUV); }\n";
+
 void g3d_renderer_cloud_pass(void) {
     if (!g_renderer.hdr_active || !g_renderer.hdr_ready || !g_renderer.active_camera) return;
     float cover, base, thick, speed;
     if (!g3d_sky_low_clouds(&cover, &base, &thick, &speed)) return;   /* off -> skip */
 
-    static G3DShaderProgram *sh = NULL;
-    if (!sh) { sh = g3d_shader_create(post_vert, cloud_frag); ensure_fs_quad(); }
-    if (!sh) return;
+    static G3DShaderProgram *sh = NULL, *csh = NULL;
+    if (!sh)  { sh = g3d_shader_create(post_vert, cloud_frag); ensure_fs_quad(); }
+    if (!csh) { csh = g3d_shader_create(post_vert, cloud_composite_frag); }
+    if (!sh || !csh) return;
+
+    /* Half-res target (1/4 the pixels for the expensive raymarch). */
+    uint32_t hw = g_renderer.display_width / 2, hh = g_renderer.display_height / 2;
+    if (hw < 1) hw = 1; if (hh < 1) hh = 1;
+    if (!g_renderer.cloud_fbo || g_renderer.cloud_w != hw || g_renderer.cloud_h != hh) {
+        if (!g_renderer.cloud_fbo) glGenFramebuffers(1, &g_renderer.cloud_fbo);
+        if (!g_renderer.cloud_tex) glGenTextures(1, &g_renderer.cloud_tex);
+        glBindTexture(GL_TEXTURE_2D, g_renderer.cloud_tex);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, hw, hh, 0, GL_RGBA, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glBindFramebuffer(GL_FRAMEBUFFER, g_renderer.cloud_fbo);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g_renderer.cloud_tex, 0);
+        g_renderer.cloud_w = hw; g_renderer.cloud_h = hh;
+    }
 
     Mat4 proj = g3d_camera_get_projection(g_renderer.active_camera);
     if (g_renderer.flip_y) { proj.m[1]=-proj.m[1]; proj.m[5]=-proj.m[5]; proj.m[9]=-proj.m[9]; proj.m[13]=-proj.m[13]; }
@@ -1000,10 +1026,11 @@ void g3d_renderer_cloud_pass(void) {
     float sdir[3], scol[3], amb[3];
     g3d_sky_get_sun(sdir, scol); g3d_sky_get_ambient(amb);
 
-    glBindFramebuffer(GL_FRAMEBUFFER, g_renderer.hdr_fbo);
-    glViewport(0, 0, g_renderer.display_width, g_renderer.display_height);
-    glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
-    glEnable(GL_BLEND); glBlendFunc(GL_ONE, GL_SRC_ALPHA);   /* dst*T + scat */
+    /* Pass 1: raymarch into the half-res target (overwrite, no blend). */
+    glBindFramebuffer(GL_FRAMEBUFFER, g_renderer.cloud_fbo);
+    glViewport(0, 0, hw, hh);
+    glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE); glDisable(GL_BLEND);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f); glClear(GL_COLOR_BUFFER_BIT);   /* scat=0, T=1 */
     glBindVertexArray(g_renderer.post_vao);
     g3d_shader_use(sh);
     glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, g_renderer.hdr_depth); g3d_shader_set_int(sh, "uDepth", 0);
@@ -1017,6 +1044,14 @@ void g3d_renderer_cloud_pass(void) {
     g3d_shader_set_float(sh, "uCloudSpeed", speed);
     g3d_shader_set_float(sh, "uCloudBase", base);
     g3d_shader_set_float(sh, "uCloudThick", thick);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+
+    /* Pass 2: composite (bilinear upscale) into HDR with the cloud blend. */
+    glBindFramebuffer(GL_FRAMEBUFFER, g_renderer.hdr_fbo);
+    glViewport(0, 0, g_renderer.display_width, g_renderer.display_height);
+    glEnable(GL_BLEND); glBlendFunc(GL_ONE, GL_SRC_ALPHA);   /* dst*T + scat */
+    g3d_shader_use(csh);
+    glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, g_renderer.cloud_tex); g3d_shader_set_int(csh, "uClouds", 0);
     glDrawArrays(GL_TRIANGLES, 0, 3);
 
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); glDisable(GL_BLEND);
