@@ -644,6 +644,10 @@ void g3d_renderer_underwater_pass(void) {
         g_renderer.post_shader = g3d_shader_create(post_vert, post_frag_underwater);
     ensure_fs_quad();
     if (!g_renderer.post_shader) return;
+    /* Draw into the scene framebuffer (HDR fbo when HDR is on); a prior pass may
+       have left another FBO bound, which would send the tint nowhere visible. */
+    glBindFramebuffer(GL_FRAMEBUFFER, g_renderer.framebuffer);
+    glViewport(0, 0, g_renderer.display_width, g_renderer.display_height);
     g3d_renderer_capture_scene();   /* grab the current frame */
     G3DShaderProgram *sh = (G3DShaderProgram *)g_renderer.post_shader;
     g3d_shader_use(sh);

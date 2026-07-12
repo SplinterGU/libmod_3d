@@ -150,6 +150,7 @@ int64_t g3d_set_bloom_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_set_tonemap_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_set_ssao_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_water_set_ssr_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_set_underwater_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_water_set_ocean_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_water_set_tessellation_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_fire_add_bgd(INSTANCE *my, int64_t *params);
@@ -171,8 +172,11 @@ int64_t g3d_mirror_set_distance_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_instances_create_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_instances_add_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_instances_set_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_instances_create_skinned_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_model_set_gpu_skin_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_submesh_lod_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_instances_set_wind_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_instances_set_alpha_cut_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_instances_set_distance_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_instances_clear_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_instances_count_bgd(INSTANCE *my, int64_t *params);
@@ -440,6 +444,7 @@ DLSYSFUNCS __bgdexport(libmod_3d, functions_exports)[] = {
     FUNC("G3D_SET_TONEMAP", "I", TYPE_INT, g3d_set_tonemap_bgd),
     FUNC("G3D_SET_SSAO", "IFF", TYPE_INT, g3d_set_ssao_bgd),
     FUNC("G3D_WATER_SET_SSR", "IF", TYPE_INT, g3d_water_set_ssr_bgd),
+    FUNC("G3D_SET_UNDERWATER", "IFFFF", TYPE_INT, g3d_set_underwater_bgd),
     FUNC("G3D_WATER_SET_OCEAN", "FFF", TYPE_INT, g3d_water_set_ocean_bgd),
     FUNC("G3D_WATER_SET_TESSELLATION", "I", TYPE_INT, g3d_water_set_tessellation_bgd),
     FUNC("G3D_FIRE_ADD", "FFFF", TYPE_INT, g3d_fire_add_bgd),
@@ -461,8 +466,11 @@ DLSYSFUNCS __bgdexport(libmod_3d, functions_exports)[] = {
     FUNC("G3D_INSTANCES_CREATE", "II", TYPE_INT, g3d_instances_create_bgd),
     FUNC("G3D_INSTANCES_ADD", "IFFFFF", TYPE_INT, g3d_instances_add_bgd),
     FUNC("G3D_INSTANCES_SET", "IIFFFFF", TYPE_INT, g3d_instances_set_bgd),
+    FUNC("G3D_INSTANCES_CREATE_SKINNED", "III", TYPE_INT, g3d_instances_create_skinned_bgd),
+    FUNC("G3D_MODEL_SET_GPU_SKIN", "II", TYPE_INT, g3d_model_set_gpu_skin_bgd),
     FUNC("G3D_MODEL_SUBMESH_LOD", "III", TYPE_INT, g3d_model_submesh_lod_bgd),
     FUNC("G3D_INSTANCES_SET_WIND", "IF", TYPE_INT, g3d_instances_set_wind_bgd),
+    FUNC("G3D_INSTANCES_SET_ALPHA_CUT", "II", TYPE_INT, g3d_instances_set_alpha_cut_bgd),
     FUNC("G3D_INSTANCES_SET_DISTANCE", "IF", TYPE_INT, g3d_instances_set_distance_bgd),
     FUNC("G3D_INSTANCES_CLEAR", "I", TYPE_INT, g3d_instances_clear_bgd),
     FUNC("G3D_INSTANCES_COUNT", "I", TYPE_INT, g3d_instances_count_bgd),

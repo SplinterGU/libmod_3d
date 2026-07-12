@@ -979,6 +979,11 @@ int64_t g3d_water_set_ssr_bgd(INSTANCE *my, int64_t *params) {
     g3d_water_set_ssr((int)params[0], *(float *)&params[1]);
     return 1;
 }
+int64_t g3d_set_underwater_bgd(INSTANCE *my, int64_t *params) {
+    g3d_renderer_set_underwater((int)params[0], *(float *)&params[1], *(float *)&params[2],
+                                *(float *)&params[3], *(float *)&params[4]);
+    return 1;
+}
 int64_t g3d_water_set_ocean_bgd(INSTANCE *my, int64_t *params) {
     g3d_water_set_ocean(*(float *)&params[0], *(float *)&params[1], *(float *)&params[2]);
     return 1;
@@ -1116,9 +1121,22 @@ int64_t g3d_instances_set_bgd(INSTANCE *my, int64_t *params) {
                       *(float *)&params[5], *(float *)&params[6]);
     return 1;
 }
+int64_t g3d_instances_create_skinned_bgd(INSTANCE *my, int64_t *params) {
+    return (int64_t)g3d_instances_create_skinned((void *)(intptr_t)params[0],
+                                                 (void *)(intptr_t)params[1],
+                                                 (void *)(intptr_t)params[2]);
+}
+int64_t g3d_model_set_gpu_skin_bgd(INSTANCE *my, int64_t *params) {
+    g3d_model_set_gpu_skin((G3DModel *)(intptr_t)params[0], (int)params[1]);
+    return 1;
+}
 
 int64_t g3d_instances_set_wind_bgd(INSTANCE *my, int64_t *params) {
     g3d_instances_set_wind((int)params[0], *(float *)&params[1]);
+    return 1;
+}
+int64_t g3d_instances_set_alpha_cut_bgd(INSTANCE *my, int64_t *params) {
+    g3d_instances_set_alpha_cut((int)params[0], (int)params[1]);
     return 1;
 }
 

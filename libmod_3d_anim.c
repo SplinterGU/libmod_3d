@@ -135,11 +135,20 @@ static void apply_pose(G3DModel *model) {
         model->joint_matrix[j] =
             mat4_multiply(model->node_global[model->joint_node[j]], model->inverse_bind[j]);
 
+    /* GPU skinning: bone matrices are computed above; the vertex shader does the
+       per-vertex work. Skip the expensive CPU skin + per-frame VBO re-upload. */
+    if (model->gpu_skin)
+        return;
+
     for (uint32_t i = 0; i < model->mesh_count; i++) {
         G3DMesh *mesh = &model->meshes[i];
         if (mesh->skinned && mesh->bind_pos && mesh->vjoints)
             skin_mesh(mesh, model->joint_matrix, model->joint_count, model->skin_offset);
     }
+}
+
+void g3d_model_set_gpu_skin(G3DModel *model, int enable) {
+    if (model) model->gpu_skin = enable ? 1 : 0;
 }
 
 void g3d_model_set_lock_root(G3DModel *model, int enable) {

@@ -94,6 +94,8 @@ int g3d_shader_get_uniform(G3DShaderProgram *program, const char *name);
    ============================================================================
  */
 
+void g3d_shader_set_mat4_array(G3DShaderProgram *program, const char *name,
+                               const Mat4 *mats, int count);
 void g3d_shader_set_mat4(G3DShaderProgram *program, const char *name,
                          Mat4 mat);
 void g3d_shader_set_mat3(G3DShaderProgram *program, const char *name,

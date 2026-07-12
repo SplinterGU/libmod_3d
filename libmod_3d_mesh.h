@@ -109,8 +109,9 @@ typedef struct {
     void **mesh_metallic;
     void **mesh_roughness;
 
-    /* ---- Skeletal animation (glTF), CPU skinning ---- */
+    /* ---- Skeletal animation (glTF) ---- */
     int skinned;                /* 1 if the model has a skin + skinned meshes */
+    int gpu_skin;               /* 1 = skip CPU skinning; skin on the GPU (bone matrices only) */
     float skin_offset[3];       /* center/ground offset applied after skinning */
 
     /* Node hierarchy (all glTF nodes) */

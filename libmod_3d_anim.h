@@ -22,6 +22,11 @@ float g3d_model_animation_duration(G3DModel *model, int anim);
    no-op for models without a skin. */
 void g3d_model_animate(G3DModel *model, int anim, float time, int loop);
 
+/* Enable GPU skinning for a model: g3d_model_animate then only computes bone
+   matrices (cheap) and the instanced skinned shader does the per-vertex work.
+   Use with g3d_instances_create_skinned. */
+void g3d_model_set_gpu_skin(G3DModel *model, int enable);
+
 /* Cross-fade two animations (weight 0 = a0, 1 = a1). Blends per bone: lerp
    translation/scale, slerp rotation. For smooth idle<->walk<->run transitions. */
 void g3d_model_animate_blend(G3DModel *model, int a0, float t0,

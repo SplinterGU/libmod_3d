@@ -34,6 +34,14 @@ GLOBAL
     int mpalm1; int mpalm2; int mpalm3; int mship;
     int pg1[15]; int pg2[15]; int pg3[15]; int pns1; int pns2; int pns3;
     float ph1; float ph2; float ph3;
+
+    // peces (bajo el agua) y avioneta (cielo alto)
+    int NH_FISHG; int N_GUPPY; int NH_FISHD; int N_DORADA; int N_PLANES;
+    int   gum[8]; float gutt[8]; float guscale;   // guppy (1 submesh)
+    int   dom[8]; float dott[8]; float doscale;   // dorada (1 submesh)
+    int gugrp[15]; int dogrp[15]; int gulod; int dolod;   // peces LOD0 (skinned) + LOD1 (estatico)
+    int mplane; int plgrp[3]; int plnsub; float plscale; float planetime; int plskinned;
+
     float lx; float lz;
     int spawned;
 END
@@ -157,6 +165,50 @@ BEGIN
     g3d_model_despawn(ent);
 END
 
+// --- Un pez en banco: circula bajo el agua alrededor del centro del banco ---
+PROCESS fish(int ftype, int herd, float cx, float cz, float radius, float depth)
+PRIVATE int grp; float a; float spd; float fx; float fz; float fy;
+BEGIN
+    a = rand(0, 359); spd = 0.5 + rand(0, 40) / 100.0;
+    LOOP
+        a = a + spd;
+        fx = cx + cos(a * 1000) * radius;
+        fz = cz + sin(a * 1000) * radius;
+        fy = depth + 0.8 * sin((a * 2.0) * 1000);   // ondeo vertical suave
+        IF (dist2cam(fx, fy, fz) < LOD_DIST * LOD_DIST)   // cerca = skinned
+            IF (ftype == 0) grp = gugrp[herd]; ELSE grp = dogrp[herd]; END
+        ELSE                                              // lejos = LOD1 estatico
+            IF (ftype == 0) grp = gulod; ELSE grp = dolod; END
+        END
+        IF (ftype == 0)
+            g3d_instances_add(grp, fx, fy, fz, a + 90.0, guscale);
+        ELSE
+            g3d_instances_add(grp, fx, fy, fz, a + 90.0, doscale);
+        END
+        IF (quit) BREAK; END
+        FRAME;
+    END
+END
+
+// --- Avioneta: circula alto (por encima de las gaviotas). Instancing SIN
+//     skinning (malla estatica en bind pose) para que no se deforme. ---
+PROCESS plane(float cx, float cz, float radius, float alt, float speed)
+PRIVATE int j; float a; float px; float pz; float py;
+BEGIN
+    a = rand(0, 359);
+    LOOP
+        a = a + speed;
+        px = cx + cos(a * 1000) * radius;
+        pz = cz + sin(a * 1000) * radius;
+        py = alt + 4.0 * sin((a * 0.4) * 1000);
+        FOR (j = 0; j < plnsub; j = j + 1)
+            g3d_instances_add(plgrp[j], px, py, pz, a + 90.0, plscale);
+        END
+        IF (quit) BREAK; END
+        FRAME;
+    END
+END
+
 PROCESS main()
 PRIVATE
     int light; int i; int h; int j;
@@ -164,7 +216,8 @@ PRIVATE
     float camx; float camy; float camz; float yaw; float pitch;
     float fwx; float fwy; float fwz; float rgx; float rgz;
     int fclouds; int fssao; int fbloom; int fssr; int fshadow; int fanim;
-    int k1; int k2; int k3; int k4; int k5; int k6;
+    int k1; int k2; int k3; int k4; int k5; int k6; int k7; int k8;
+    int gokuanim; int funder;
 BEGIN
     priority = 100;              // main corre ANTES que las criaturas (limpia grupos)
     set_mode(1920, 1080, MODE_FULLSCREEN);
@@ -174,7 +227,10 @@ BEGIN
     NH_CRAB  = 6; N_CRAB  = 120;
     NH_GULL  = 8; N_GULL  = 240;
     N_SHIPS = 4; N_PALMS = 28;
-    LOD_DIST = 55.0;
+    NH_FISHG = 4; N_GUPPY = 100;   // guppy
+    NH_FISHD = 4; N_DORADA = 70;   // dorada
+    N_PLANES = 3;
+    LOD_DIST = 60.0;   // criaturas lejanas -> LOD1 estatico (sin skinning) = mas FPS
 
     scene = g3d_scene_load("demo_beach.scene");
     IF (scene < 0) say("ERROR cargando demo_beach.scene"); RETURN; END
@@ -215,31 +271,58 @@ BEGIN
     FOR (i = 0; i < N_SHIPS; i = i + 1) sea_point(); boat(mship, lx, lz, rand(0, 359)); END
 
     // ---- manadas + grupos LOD0 (skinned) ----
-    FOR (h = 0; h < NH_TRIBU; h = h + 1) tm[h] = g3d_load_gltf("assets/tribu.glb"); tt[h] = h * 1.6; END
-    FOR (h = 0; h < NH_CRAB;  h = h + 1) cm[h] = g3d_load_gltf("assets/crab.glb");  ct[h] = h * 0.5; END
-    FOR (h = 0; h < NH_GULL;  h = h + 1) gm[h] = g3d_load_gltf("assets/gaviota.glb"); gt[h] = h * 1.0; END
+    // gpu_skin = 1 -> animate solo calcula matrices de hueso; el shader skinnea
+    FOR (h = 0; h < NH_TRIBU; h = h + 1) tm[h] = g3d_load_gltf("assets/goku_kid.glb"); g3d_model_set_gpu_skin(tm[h], 1); tt[h] = h * 1.6; END
+    FOR (h = 0; h < NH_CRAB;  h = h + 1) cm[h] = g3d_load_gltf("assets/crab.glb");  g3d_model_set_gpu_skin(cm[h], 1); ct[h] = h * 0.5; END
+    FOR (h = 0; h < NH_GULL;  h = h + 1) gm[h] = g3d_load_gltf("assets/gaviota.glb"); g3d_model_set_gpu_skin(gm[h], 1); gt[h] = h * 1.0; END
     tnsub = g3d_model_submesh_count(tm[0]); tscale = 3.2 / g3d_model_height(tm[0]);
     cnsub = g3d_model_submesh_count(cm[0]); cscale = 1.4 / g3d_model_height(cm[0]);
     gnsub = g3d_model_submesh_count(gm[0]); gscale = 1.4 / g3d_model_height(gm[0]);
+    // LOD0 = grupos SKINNED (skinning en GPU)
     FOR (h = 0; h < NH_TRIBU; h = h + 1)
-        FOR (j = 0; j < tnsub; j = j + 1) tgrp[h*tnsub+j] = g3d_instances_create(g3d_model_submesh(tm[h], j), g3d_model_submesh_texture(tm[h], j)); g3d_instances_set_distance(tgrp[h*tnsub+j], 600.0); END
+        FOR (j = 0; j < tnsub; j = j + 1) tgrp[h*tnsub+j] = g3d_instances_create_skinned(g3d_model_submesh(tm[h], j), g3d_model_submesh_texture(tm[h], j), tm[h]); g3d_instances_set_distance(tgrp[h*tnsub+j], 600.0); END
     END
     FOR (h = 0; h < NH_CRAB; h = h + 1)
-        FOR (j = 0; j < cnsub; j = j + 1) cgrp[h*cnsub+j] = g3d_instances_create(g3d_model_submesh(cm[h], j), g3d_model_submesh_texture(cm[h], j)); g3d_instances_set_distance(cgrp[h*cnsub+j], 600.0); END
+        FOR (j = 0; j < cnsub; j = j + 1) cgrp[h*cnsub+j] = g3d_instances_create_skinned(g3d_model_submesh(cm[h], j), g3d_model_submesh_texture(cm[h], j), cm[h]); g3d_instances_set_distance(cgrp[h*cnsub+j], 600.0); END
     END
     FOR (h = 0; h < NH_GULL; h = h + 1)
-        FOR (j = 0; j < gnsub; j = j + 1) ggrp[h*gnsub+j] = g3d_instances_create(g3d_model_submesh(gm[h], j), g3d_model_submesh_texture(gm[h], j)); g3d_instances_set_distance(ggrp[h*gnsub+j], 600.0); END
+        FOR (j = 0; j < gnsub; j = j + 1) ggrp[h*gnsub+j] = g3d_instances_create_skinned(g3d_model_submesh(gm[h], j), g3d_model_submesh_texture(gm[h], j), gm[h]); g3d_instances_set_distance(ggrp[h*gnsub+j], 600.0); END
     END
     // ---- grupos LOD1 (simplificado, compartido por tipo) ----
     FOR (j = 0; j < tnsub; j = j + 1) tlod[j] = g3d_instances_create(g3d_model_submesh_lod(tm[0], j, 10), g3d_model_submesh_texture(tm[0], j)); g3d_instances_set_distance(tlod[j], 600.0); END
     FOR (j = 0; j < cnsub; j = j + 1) clod[j] = g3d_instances_create(g3d_model_submesh_lod(cm[0], j, 10), g3d_model_submesh_texture(cm[0], j)); g3d_instances_set_distance(clod[j], 600.0); END
     FOR (j = 0; j < gnsub; j = j + 1) glod[j] = g3d_instances_create(g3d_model_submesh_lod(gm[0], j, 8),  g3d_model_submesh_texture(gm[0], j)); g3d_instances_set_distance(glod[j], 600.0); END
 
+    // ---- peces (guppy + dorada): skinned instancing, 1 submesh ----
+    FOR (h = 0; h < NH_FISHG; h = h + 1) gum[h] = g3d_load_gltf("assets/guppy.glb"); g3d_model_set_gpu_skin(gum[h], 1); END
+    FOR (h = 0; h < NH_FISHD; h = h + 1) dom[h] = g3d_load_gltf("assets/dorada.glb"); g3d_model_set_gpu_skin(dom[h], 1); END
+    guscale = 1.0 / g3d_model_height(gum[0]);   // guppy ~1u
+    doscale = 1.6 / g3d_model_height(dom[0]);   // dorada ~1.6u
+    FOR (h = 0; h < NH_FISHG; h = h + 1) gugrp[h] = g3d_instances_create_skinned(g3d_model_submesh(gum[h], 0), g3d_model_submesh_texture(gum[h], 0), gum[h]); g3d_instances_set_distance(gugrp[h], 600.0); END
+    FOR (h = 0; h < NH_FISHD; h = h + 1) dogrp[h] = g3d_instances_create_skinned(g3d_model_submesh(dom[h], 0), g3d_model_submesh_texture(dom[h], 0), dom[h]); g3d_instances_set_distance(dogrp[h], 600.0); END
+    // LOD1 de peces (simplificado, estatico, compartido) -> peces lejanos sin skinning
+    gulod = g3d_instances_create(g3d_model_submesh_lod(gum[0], 0, 8), g3d_model_submesh_texture(gum[0], 0)); g3d_instances_set_distance(gulod, 600.0);
+    dolod = g3d_instances_create(g3d_model_submesh_lod(dom[0], 0, 8), g3d_model_submesh_texture(dom[0], 0)); g3d_instances_set_distance(dolod, 600.0);
+    // ---- avioneta: ESTATICA (sin skinning: barato y la bind pose ya es correcta).
+    //      Solo submesh 0 (cuerpo texturado); ignora outline/blur del modelo toon. ----
+    mplane = g3d_load_gltf("assets/avioneta.glb");
+    plnsub = g3d_model_submesh_count(mplane);
+    IF (plnsub > 1) plnsub = 1; END
+    plskinned = 0;
+    FOR (j = 0; j < plnsub; j = j + 1) plgrp[j] = g3d_instances_create(g3d_model_submesh(mplane, j), g3d_model_submesh_texture(mplane, j)); g3d_instances_set_distance(plgrp[j], 900.0); g3d_instances_set_alpha_cut(plgrp[j], 0); END
+    plscale = 14.0 / g3d_model_height(mplane);
+    IF (plscale <= 0.0 OR plscale > 40.0) plscale = 7.0; END
+
     // ---- spawn: UN PROCESO POR CRIATURA ----
     FOR (i = 0; i < N_TRIBU; i = i + 1) land_point(); tribu(i % NH_TRIBU, lx, lz); END
     FOR (i = 0; i < N_CRAB;  i = i + 1) land_point(); crab(i % NH_CRAB, lx, lz); END
     FOR (i = 0; i < N_GULL;  i = i + 1) gull(i % NH_GULL, -120.0 + rand(0, 240), -120.0 + rand(0, 160), 12.0 + rand(0, 40), 22.0 + rand(0, 45)); END
-    spawned = N_TRIBU + N_CRAB + N_GULL;
+    // peces: bancos bajo el agua (centro en zona de mar, profundidad negativa)
+    FOR (i = 0; i < N_GUPPY; i = i + 1) sea_point(); fish(0, i % NH_FISHG, lx, lz, 4.0 + rand(0, 8), -2.0 - rand(0, 3)); END
+    FOR (i = 0; i < N_DORADA; i = i + 1) sea_point(); fish(1, i % NH_FISHD, lx, lz, 5.0 + rand(0, 10), -2.5 - rand(0, 3)); END
+    // avionetas: circulan ALTO (gaviotas van a 22-67 -> avioneta a 95-120)
+    FOR (i = 0; i < N_PLANES; i = i + 1) plane(-40.0 + rand(0, 80), -60.0 + rand(0, 80), 90.0 + rand(0, 40), 95.0 + rand(0, 25), 0.35 + rand(0, 20) / 100.0); END
+    spawned = N_TRIBU + N_CRAB + N_GULL + N_GUPPY + N_DORADA;
 
     camx = 0.0; camy = 60.0; camz = 70.0;
     yaw = 180.0; pitch = -28.0; msens = 0.18; dt = 1.0 / 60.0;
@@ -247,7 +330,9 @@ BEGIN
     g3d_mouse_capture(1);
 
     fclouds = 1; fssao = 1; fbloom = 1; fssr = 1; fshadow = 1; fanim = 1;
-    write(0, 10, 10, 0, "PROFILE: 1 nubes  2 SSAO  3 bloom  4 SSR  5 sombras  6 skinning(anim)");
+    gokuanim = 2; funder = 0;
+    write(0, 10, 10, 0, "PROFILE: 1 nubes 2 SSAO 3 bloom 4 SSR 5 sombras 6 skinning  |  7 = anim goku");
+    write(0, 10, 64, 0, "goku anim:"); write_var(0, 100, 64, 0, gokuanim);
     write(0, 10, 28, 0, "Criaturas:"); write_var(0, 110, 28, 0, spawned);
     write(0, 10, 46, 0, "nubes:"); write_var(0, 70, 46, 0, fclouds);
     write(0, 110, 46, 0, "ssao:"); write_var(0, 165, 46, 0, fssao);
@@ -255,6 +340,7 @@ BEGIN
     write(0, 320, 46, 0, "ssr:"); write_var(0, 365, 46, 0, fssr);
     write(0, 410, 46, 0, "sombras:"); write_var(0, 490, 46, 0, fshadow);
     write(0, 1770, 1052, 0, "FPS:");   write_var(0, 1815, 1052, 0, frame_info.fps);
+    write(0, 1620, 1030, 0, "cam Y (bajo 0 = agua):"); write_var(0, 1820, 1030, 0, camy);
 
     LOOP
         // limpiar grupos de criaturas (main tiene prioridad alta -> corre antes)
@@ -264,11 +350,18 @@ BEGIN
         FOR (i = 0; i < tnsub; i = i + 1) g3d_instances_clear(tlod[i]); END
         FOR (i = 0; i < cnsub; i = i + 1) g3d_instances_clear(clod[i]); END
         FOR (i = 0; i < gnsub; i = i + 1) g3d_instances_clear(glod[i]); END
+        FOR (i = 0; i < NH_FISHG; i = i + 1) g3d_instances_clear(gugrp[i]); END
+        FOR (i = 0; i < NH_FISHD; i = i + 1) g3d_instances_clear(dogrp[i]); END
+        g3d_instances_clear(gulod); g3d_instances_clear(dolod);
+        FOR (i = 0; i < plnsub; i = i + 1) g3d_instances_clear(plgrp[i]); END
 
         IF (fanim)
-            FOR (h = 0; h < NH_TRIBU; h = h + 1) tt[h] += dt;      g3d_model_animate(tm[h], 0, tt[h], 1); END
+            FOR (h = 0; h < NH_TRIBU; h = h + 1) tt[h] += dt;      g3d_model_animate(tm[h], gokuanim, tt[h], 1); END
             FOR (h = 0; h < NH_CRAB;  h = h + 1) ct[h] += dt;      g3d_model_animate(cm[h], 0, ct[h], 1); END
             FOR (h = 0; h < NH_GULL;  h = h + 1) gt[h] += dt * 1.4; g3d_model_animate(gm[h], 0, gt[h], 1); END
+            FOR (h = 0; h < NH_FISHG; h = h + 1) gutt[h] += dt;    g3d_model_animate(gum[h], 0, gutt[h], 1); END
+            FOR (h = 0; h < NH_FISHD; h = h + 1) dott[h] += dt;    g3d_model_animate(dom[h], 0, dott[h], 1); END
+            IF (plskinned) planetime += dt; g3d_model_animate(mplane, 0, planetime, 1); END
         END
 
         spd = 1.4; IF (key(_L_SHIFT) OR key(_R_SHIFT)) spd = 5.0; END
@@ -284,6 +377,13 @@ BEGIN
         gcamx = camx; gcamy = camy; gcamz = camz;
         g3d_camera_set_position(camera, camx, camy, camz);
         g3d_camera_look_at(camera, camx + fwx, camy + fwy, camz + fwz, 0.0, 1.0, 0.0);
+
+        // distorsion + tinte cuando la camara baja del nivel del mar (Y=0), o forzado con tecla 8
+        IF (camy < 0.0 OR funder)
+            g3d_set_underwater(1, 0.04, 0.28, 0.42, 1.5);
+        ELSE
+            g3d_set_underwater(0, 0.0, 0.0, 0.0, 0.0);
+        END
 
         // --- PROFILING: apagar/encender efectos caros y ver que recupera FPS ---
         IF (key(_1) AND k1 == 0)
@@ -301,6 +401,10 @@ BEGIN
         k5 = key(_5);
         IF (key(_6) AND k6 == 0) fanim = 1 - fanim; END   // congela skinning (diagnostico CPU)
         k6 = key(_6);
+        IF (key(_7) AND k7 == 0) gokuanim = gokuanim + 1; IF (gokuanim > 8) gokuanim = 0; END END   // cicla animacion de goku (0..8)
+        k7 = key(_7);
+        IF (key(_8) AND k8 == 0) funder = 1 - funder; END   // FUERZA underwater (test del pase)
+        k8 = key(_8);
 
         IF (key(_ESC)) quit = 1; BREAK; END
         FRAME;

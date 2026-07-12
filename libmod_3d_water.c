@@ -742,6 +742,10 @@ int g3d_fluid_count(void) { return g_fluid.count; }
    renderer's underwater post-process. Called by the renderer each frame. */
 void g3d_water_update_underwater(G3DCamera *camera) {
     if (!camera) return;
+    /* No water plane or fluid zone registered (e.g. ocean/watersim-only scenes):
+       don't override manual g3d_set_underwater control. */
+    if (!(g_water.enabled && g_water.initialized) && g_fluid.count == 0)
+        return;
     Vec3 p = camera->position;
     int under = 0;
     float tint[3] = {0.10f, 0.26f, 0.34f};

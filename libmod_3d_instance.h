@@ -29,7 +29,14 @@ int g3d_instances_add(int group, float x, float y, float z,
 void g3d_instances_set(int group, int index, float x, float y, float z,
                        float yaw_deg, float scale);
 
+/* Like g3d_instances_create but GPU-skinned: `mesh` is a skinned submesh (with
+   bind pose + joints/weights) and `model` supplies the bone matrices. Call
+   g3d_model_set_gpu_skin(model, 1) so animate only computes bones. */
+int g3d_instances_create_skinned(void *mesh, void *texture, void *model);
+
 void g3d_instances_set_wind(int group, float strength);
+/* 1 = alpha-test discard (foliage/leaves); 0 = solid (creatures). Default 1. */
+void g3d_instances_set_alpha_cut(int group, int enabled);
 void g3d_instances_set_distance(int group, float dist);
 void g3d_instances_clear(int group);
 int g3d_instances_count(int group);

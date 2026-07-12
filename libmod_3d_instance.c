@@ -13,6 +13,7 @@
 #include "libmod_3d_math.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 
 #include <SDL.h>
@@ -69,6 +70,7 @@ static const char *inst_frag =
     "uniform sampler2D uShadowMap;\n"
     "uniform mat4 uLightSpace;\n"
     "uniform int uHasShadow;\n"
+    "uniform int uAlphaCut;\n"       /* 1 = alpha-test (foliage); 0 = solid (creatures) */
     "out vec4 FragColor;\n"
     "float shadowAt() {\n"
     "    if (uHasShadow == 0) return 0.0;\n"
@@ -85,7 +87,7 @@ static const char *inst_frag =
     "}\n"
     "void main() {\n"
     "    vec3 albedo = uHasTex == 1 ? texture(uTex, vUV).rgb : vec3(0.4, 0.6, 0.3);\n"
-    "    if (uHasTex == 1 && texture(uTex, vUV).a < 0.5) discard;\n"  /* alpha-cut leaves */
+    "    if (uAlphaCut == 1 && uHasTex == 1 && texture(uTex, vUV).a < 0.5) discard;\n"  /* alpha-cut leaves only */
     "    float d = max(dot(normalize(vN), normalize(-uLightDir)), 0.0);\n"
     "    float sh = shadowAt();\n"
     "    vec3 col = albedo * (uAmbient + uLightColor * d * (1.0 - sh * 0.7));\n"
@@ -115,6 +117,60 @@ static const char *inst_depth_frag =
     "#version 330 core\n"
     "void main() {}\n";
 
+/* ---- GPU-skinned instanced shaders (bind pose + per-vertex joints/weights,
+   per-instance matrix in 3..6, bone matrices in uBones). Reuses inst_frag. ---- */
+#define INST_MAX_BONES 100
+static const char *inst_skin_vert =
+    "#version 330 core\n"
+    "layout(location=0) in vec3 position;\n"
+    "layout(location=1) in vec3 normal;\n"
+    "layout(location=2) in vec2 texcoord;\n"
+    "layout(location=3) in vec4 iM0;\n"
+    "layout(location=4) in vec4 iM1;\n"
+    "layout(location=5) in vec4 iM2;\n"
+    "layout(location=6) in vec4 iM3;\n"
+    "layout(location=7) in vec4 joints;\n"
+    "layout(location=8) in vec4 weights;\n"
+    "uniform mat4 uView; uniform mat4 uProjection;\n"
+    "uniform mat4 uBones[100]; uniform vec3 uSkinOffset; uniform int uBoneCount;\n"
+    "out vec3 vN; out vec2 vUV; out vec3 vWP;\n"
+    "void main(){\n"
+    "  mat4 M = mat4(iM0,iM1,iM2,iM3);\n"
+    "  float ws = weights.x+weights.y+weights.z+weights.w;\n"
+    "  ivec4 ji = clamp(ivec4(joints), ivec4(0), ivec4(uBoneCount-1));\n"   /* avoid garbage bones */
+    "  mat4 sm;\n"
+    "  if (ws < 1e-5) sm = mat4(1.0);\n"
+    "  else sm = weights.x*uBones[ji.x] + weights.y*uBones[ji.y]\n"
+    "          + weights.z*uBones[ji.z] + weights.w*uBones[ji.w];\n"
+    "  vec3 sp = (sm * vec4(position,1.0)).xyz + uSkinOffset;\n"
+    "  vec4 wp = M * vec4(sp, 1.0);\n"
+    "  gl_Position = uProjection * uView * wp;\n"
+    "  vN = normalize(mat3(M) * mat3(sm) * normal);\n"
+    "  vUV = texcoord; vWP = wp.xyz;\n"
+    "}\n";
+static const char *inst_skin_depth_vert =
+    "#version 330 core\n"
+    "layout(location=0) in vec3 position;\n"
+    "layout(location=3) in vec4 iM0;\n"
+    "layout(location=4) in vec4 iM1;\n"
+    "layout(location=5) in vec4 iM2;\n"
+    "layout(location=6) in vec4 iM3;\n"
+    "layout(location=7) in vec4 joints;\n"
+    "layout(location=8) in vec4 weights;\n"
+    "uniform mat4 uLightSpace;\n"
+    "uniform mat4 uBones[100]; uniform vec3 uSkinOffset; uniform int uBoneCount;\n"
+    "void main(){\n"
+    "  mat4 M = mat4(iM0,iM1,iM2,iM3);\n"
+    "  float ws = weights.x+weights.y+weights.z+weights.w;\n"
+    "  ivec4 ji = clamp(ivec4(joints), ivec4(0), ivec4(uBoneCount-1));\n"
+    "  mat4 sm;\n"
+    "  if (ws < 1e-5) sm = mat4(1.0);\n"
+    "  else sm = weights.x*uBones[ji.x] + weights.y*uBones[ji.y]\n"
+    "          + weights.z*uBones[ji.z] + weights.w*uBones[ji.w];\n"
+    "  vec3 sp = (sm * vec4(position,1.0)).xyz + uSkinOffset;\n"
+    "  gl_Position = uLightSpace * (M * vec4(sp,1.0));\n"
+    "}\n";
+
 typedef struct {
     int active;
     G3DMesh *mesh;
@@ -129,12 +185,19 @@ typedef struct {
     int all_uploaded;       /* matrices currently in all_vbo */
     int dirty;              /* mats changed since last all_vbo upload */
     float *visible;         /* temp visible matrices, cap*16 */
+    int alpha_cut;          /* 1 = alpha-test discard (foliage); 0 = solid */
+    /* GPU skinning */
+    int skinned;            /* 1 = skin on the GPU using skin_model's bones */
+    G3DModel *skin_model;   /* bone matrix source (whole model, shared submeshes) */
+    unsigned int skin_vbo;  /* bind pose + normal + uv + joints + weights (interleaved) */
 } Group;
 
 static struct {
     int initialized;
     G3DShaderProgram *shader;
     G3DShaderProgram *depth_shader;
+    G3DShaderProgram *skin_shader;
+    G3DShaderProgram *skin_depth_shader;
     Group g[MAX_GROUPS];
 } g_inst = {0};
 
@@ -145,6 +208,10 @@ static int inst_init(void) {
     if (!g_inst.shader) { fprintf(stderr, "G3D: instance shader failed\n"); return 0; }
     g_inst.depth_shader = g3d_shader_create(inst_depth_vert, inst_depth_frag);
     if (!g_inst.depth_shader) { fprintf(stderr, "G3D: instance depth shader failed\n"); return 0; }
+    g_inst.skin_shader = g3d_shader_create(inst_skin_vert, inst_frag);
+    if (!g_inst.skin_shader) { fprintf(stderr, "G3D: instance skin shader failed\n"); return 0; }
+    g_inst.skin_depth_shader = g3d_shader_create(inst_skin_depth_vert, inst_depth_frag);
+    if (!g_inst.skin_depth_shader) { fprintf(stderr, "G3D: instance skin depth shader failed\n"); return 0; }
 #endif
     g_inst.initialized = 1;
     return 1;
@@ -193,6 +260,57 @@ static void build_vao(Group *gr) {
     glBindVertexArray(0);
 }
 
+/* Build a GPU-skinning group VAO: bind pose + normal + uv + joints + weights
+   interleaved in skin_vbo (attribs 0,1,2,7,8), per-instance matrix (3..6), the
+   mesh index buffer. The vertex shader skins from uBones. */
+static void build_vao_skinned(Group *gr) {
+    G3DMesh *m = gr->mesh;
+    uint32_t vc = m->vertex_count;
+    float *buf = (float *)malloc((size_t)vc * 16 * sizeof(float));
+    for (uint32_t v = 0; v < vc; v++) {
+        float *o = &buf[v * 16];
+        o[0]=m->bind_pos[v*3+0]; o[1]=m->bind_pos[v*3+1]; o[2]=m->bind_pos[v*3+2];
+        o[3]=m->bind_nrm[v*3+0]; o[4]=m->bind_nrm[v*3+1]; o[5]=m->bind_nrm[v*3+2];
+        o[6]=m->vertices[v].texcoord[0]; o[7]=m->vertices[v].texcoord[1];
+        o[8]=(float)m->vjoints[v*4+0]; o[9]=(float)m->vjoints[v*4+1];
+        o[10]=(float)m->vjoints[v*4+2]; o[11]=(float)m->vjoints[v*4+3];
+        o[12]=m->vweights[v*4+0]; o[13]=m->vweights[v*4+1];
+        o[14]=m->vweights[v*4+2]; o[15]=m->vweights[v*4+3];
+    }
+    glGenBuffers(1, &gr->skin_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, gr->skin_vbo);
+    glBufferData(GL_ARRAY_BUFFER, (size_t)vc * 16 * sizeof(float), buf, GL_STATIC_DRAW);
+    free(buf);
+
+    /* camera VAO */
+    glGenVertexArrays(1, &gr->vao);
+    glGenBuffers(1, &gr->inst_vbo);
+    glBindVertexArray(gr->vao);
+    glBindBuffer(GL_ARRAY_BUFFER, gr->skin_vbo);   /* stride 16 floats = 64 bytes */
+    glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,64,(void*)0);
+    glEnableVertexAttribArray(1); glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,64,(void*)12);
+    glEnableVertexAttribArray(2); glVertexAttribPointer(2,2,GL_FLOAT,GL_FALSE,64,(void*)24);
+    glEnableVertexAttribArray(7); glVertexAttribPointer(7,4,GL_FLOAT,GL_FALSE,64,(void*)32);
+    glEnableVertexAttribArray(8); glVertexAttribPointer(8,4,GL_FLOAT,GL_FALSE,64,(void*)48);
+    glBindBuffer(GL_ARRAY_BUFFER, gr->inst_vbo);
+    for (int i=0;i<4;i++){ glEnableVertexAttribArray(3+i); glVertexAttribPointer(3+i,4,GL_FLOAT,GL_FALSE,64,(void*)(intptr_t)(i*16)); glVertexAttribDivisor(3+i,1); }
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m->ebo);
+    glBindVertexArray(0);
+
+    /* shadow VAO (pos + joints + weights + all-instance matrices) */
+    glGenVertexArrays(1, &gr->vao_shadow);
+    glGenBuffers(1, &gr->all_vbo);
+    glBindVertexArray(gr->vao_shadow);
+    glBindBuffer(GL_ARRAY_BUFFER, gr->skin_vbo);
+    glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,64,(void*)0);
+    glEnableVertexAttribArray(7); glVertexAttribPointer(7,4,GL_FLOAT,GL_FALSE,64,(void*)32);
+    glEnableVertexAttribArray(8); glVertexAttribPointer(8,4,GL_FLOAT,GL_FALSE,64,(void*)48);
+    glBindBuffer(GL_ARRAY_BUFFER, gr->all_vbo);
+    for (int i=0;i<4;i++){ glEnableVertexAttribArray(3+i); glVertexAttribPointer(3+i,4,GL_FLOAT,GL_FALSE,64,(void*)(intptr_t)(i*16)); glVertexAttribDivisor(3+i,1); }
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m->ebo);
+    glBindVertexArray(0);
+}
+
 /* Upload all instance matrices to all_vbo if they changed. */
 static void ensure_all_uploaded(Group *gr) {
     if (!gr->dirty && gr->all_uploaded == gr->count) return;
@@ -212,16 +330,45 @@ int g3d_instances_create(void *mesh, void *texture) {
     Group *gr = &g_inst.g[idx];
     gr->mesh = (G3DMesh *)mesh;
     G3DTexture *t = (G3DTexture *)texture;
-    gr->tex = t ? t->gl_handle : 0;
+    gr->tex = (t && (intptr_t)t != -1) ? t->gl_handle : 0;   /* -1 = no texture */
     gr->cap = 256;
     gr->mats = (float *)malloc((size_t)gr->cap * 16 * sizeof(float));
     gr->visible = (float *)malloc((size_t)gr->cap * 16 * sizeof(float));
     gr->count = 0;
     gr->wind = 0.0f;
     gr->max_dist = 250.0f;
+    gr->alpha_cut = 1;      /* default: foliage-style alpha test */
     gr->gpu_cap = 0;
 #ifndef VITA
     build_vao(gr);
+#endif
+    gr->active = 1;
+    return idx;
+}
+
+int g3d_instances_create_skinned(void *mesh, void *texture, void *model) {
+    G3DMesh *m = (G3DMesh *)mesh;
+    G3DModel *mo = (G3DModel *)model;
+    if (!m || !mo || !inst_init()) return -1;
+    if (!m->bind_pos || !m->bind_nrm || !m->vjoints || !m->vweights) return -1;  /* not skinnable */
+    int idx = -1;
+    for (int i = 0; i < MAX_GROUPS; i++)
+        if (!g_inst.g[i].active) { idx = i; break; }
+    if (idx < 0) return -1;
+    Group *gr = &g_inst.g[idx];
+    memset(gr, 0, sizeof(Group));
+    gr->mesh = m;
+    G3DTexture *t = (G3DTexture *)texture;
+    gr->tex = (t && (intptr_t)t != -1) ? t->gl_handle : 0;
+    gr->cap = 256;
+    gr->mats = (float *)malloc((size_t)gr->cap * 16 * sizeof(float));
+    gr->visible = (float *)malloc((size_t)gr->cap * 16 * sizeof(float));
+    gr->max_dist = 250.0f;
+    gr->alpha_cut = 1;      /* creatures with alpha textures still discard transparent bg */
+    gr->skinned = 1;
+    gr->skin_model = mo;
+#ifndef VITA
+    build_vao_skinned(gr);
 #endif
     gr->active = 1;
     return idx;
@@ -265,6 +412,10 @@ void g3d_instances_set(int group, int index, float x, float y, float z,
 void g3d_instances_set_wind(int group, float strength) {
     if (group >= 0 && group < MAX_GROUPS && g_inst.g[group].active)
         g_inst.g[group].wind = strength;
+}
+void g3d_instances_set_alpha_cut(int group, int enabled) {
+    if (group >= 0 && group < MAX_GROUPS && g_inst.g[group].active)
+        g_inst.g[group].alpha_cut = enabled ? 1 : 0;
 }
 void g3d_instances_set_distance(int group, float dist) {
     if (group >= 0 && group < MAX_GROUPS && g_inst.g[group].active)
@@ -341,15 +492,26 @@ void g3d_instances_render_depth(Mat4 light_space) {
     for (int i = 0; i < MAX_GROUPS; i++) if (g_inst.g[i].active && g_inst.g[i].count) any = 1;
     if (!any) return;
 
+    float now = (float)SDL_GetTicks() / 1000.0f;
     g3d_shader_use(g_inst.depth_shader);
     g3d_shader_set_mat4(g_inst.depth_shader, "uLightSpace", light_space);
-    g3d_shader_set_float(g_inst.depth_shader, "uTime", (float)SDL_GetTicks() / 1000.0f);
+    g3d_shader_set_float(g_inst.depth_shader, "uTime", now);
+    g3d_shader_use(g_inst.skin_depth_shader);
+    g3d_shader_set_mat4(g_inst.skin_depth_shader, "uLightSpace", light_space);
 
     for (int i = 0; i < MAX_GROUPS; i++) {
         Group *gr = &g_inst.g[i];
         if (!gr->active || gr->count == 0) continue;
         ensure_all_uploaded(gr);
-        g3d_shader_set_float(g_inst.depth_shader, "uWind", gr->wind);
+        if (gr->skinned && gr->skin_model) {
+            g3d_shader_use(g_inst.skin_depth_shader);
+            g3d_shader_set_mat4_array(g_inst.skin_depth_shader, "uBones", gr->skin_model->joint_matrix, gr->skin_model->joint_count);
+            g3d_shader_set_vec3(g_inst.skin_depth_shader, "uSkinOffset", vec3_make(gr->skin_model->skin_offset[0], gr->skin_model->skin_offset[1], gr->skin_model->skin_offset[2]));
+            g3d_shader_set_int(g_inst.skin_depth_shader, "uBoneCount", gr->skin_model->joint_count);
+        } else {
+            g3d_shader_use(g_inst.depth_shader);
+            g3d_shader_set_float(g_inst.depth_shader, "uWind", gr->wind);
+        }
         glBindVertexArray(gr->vao_shadow);
         glDrawElementsInstanced(GL_TRIANGLES, gr->mesh->index_count,
                                 GL_UNSIGNED_INT, 0, gr->count);
@@ -389,24 +551,28 @@ void g3d_instances_render_all(G3DCamera *camera, int flip_y) {
         }
     }
 
-    g3d_shader_use(g_inst.shader);
-    g3d_shader_set_mat4(g_inst.shader, "uView", view);
-    g3d_shader_set_mat4(g_inst.shader, "uProjection", proj);
-    g3d_shader_set_float(g_inst.shader, "uTime", (float)SDL_GetTicks() / 1000.0f);
-    g3d_shader_set_vec3(g_inst.shader, "uLightDir", ldir);
-    g3d_shader_set_vec3(g_inst.shader, "uLightColor", lcol);
-    g3d_shader_set_vec3(g_inst.shader, "uAmbient", vec3_make(0.40f, 0.42f, 0.45f));
-
-    /* Receive shadows from the directional shadow map (unit 1) */
-    if (g3d_renderer_shadows_on()) {
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, g3d_renderer_shadow_texture());
-        g3d_shader_set_int(g_inst.shader, "uShadowMap", 1);
-        g3d_shader_set_mat4(g_inst.shader, "uLightSpace", g3d_renderer_light_space());
-        g3d_shader_set_int(g_inst.shader, "uHasShadow", 1);
-        glActiveTexture(GL_TEXTURE0);
-    } else {
-        g3d_shader_set_int(g_inst.shader, "uHasShadow", 0);
+    /* Set the common uniforms on BOTH the static and the skinned shader. */
+    float now = (float)SDL_GetTicks() / 1000.0f;
+    int shadows = g3d_renderer_shadows_on();
+    if (shadows) { glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, g3d_renderer_shadow_texture()); glActiveTexture(GL_TEXTURE0); }
+    Mat4 lspace = g3d_renderer_light_space();
+    G3DShaderProgram *shaders2[2] = { g_inst.shader, g_inst.skin_shader };
+    for (int s = 0; s < 2; s++) {
+        G3DShaderProgram *sp = shaders2[s];
+        g3d_shader_use(sp);
+        g3d_shader_set_mat4(sp, "uView", view);
+        g3d_shader_set_mat4(sp, "uProjection", proj);
+        g3d_shader_set_float(sp, "uTime", now);
+        g3d_shader_set_vec3(sp, "uLightDir", ldir);
+        g3d_shader_set_vec3(sp, "uLightColor", lcol);
+        g3d_shader_set_vec3(sp, "uAmbient", vec3_make(0.40f, 0.42f, 0.45f));
+        if (shadows) {
+            g3d_shader_set_int(sp, "uShadowMap", 1);
+            g3d_shader_set_mat4(sp, "uLightSpace", lspace);
+            g3d_shader_set_int(sp, "uHasShadow", 1);
+        } else {
+            g3d_shader_set_int(sp, "uHasShadow", 0);
+        }
     }
 
     glEnable(GL_DEPTH_TEST);
@@ -424,6 +590,15 @@ void g3d_instances_render_all(G3DCamera *camera, int flip_y) {
         float md2 = gr->max_dist * gr->max_dist;
         Vec3 amn = vec3_make(gr->mesh->aabb_min[0], gr->mesh->aabb_min[1], gr->mesh->aabb_min[2]);
         Vec3 amx = vec3_make(gr->mesh->aabb_max[0], gr->mesh->aabb_max[1], gr->mesh->aabb_max[2]);
+        /* Pad the bind-pose AABB so animated geometry (crab legs, bird wings that
+           swing well beyond the bind pose) near the frustum edge is not wrongly
+           culled -> no pop/flicker. 80% bigger box. */
+        {
+            float cx=(amn.x+amx.x)*0.5f, cy=(amn.y+amx.y)*0.5f, cz=(amn.z+amx.z)*0.5f;
+            float hx=(amx.x-amn.x)*0.9f, hy=(amx.y-amn.y)*0.9f, hz=(amx.z-amn.z)*0.9f;
+            amn = vec3_make(cx-hx, cy-hy, cz-hz);
+            amx = vec3_make(cx+hx, cy+hy, cz+hz);
+        }
         int vis = 0;
         for (int n = 0; n < gr->count; n++) {
             float *m = &gr->mats[n * 16];
@@ -449,14 +624,24 @@ void g3d_instances_render_all(G3DCamera *camera, int flip_y) {
             glBufferSubData(GL_ARRAY_BUFFER, 0, (size_t)vis * 64, gr->visible);
         }
 
+        G3DShaderProgram *sp = gr->skinned ? g_inst.skin_shader : g_inst.shader;
+        g3d_shader_use(sp);
+        g3d_shader_set_int(sp, "uAlphaCut", gr->alpha_cut);
         if (gr->tex) {
+            glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, gr->tex);
-            g3d_shader_set_int(g_inst.shader, "uTex", 0);
-            g3d_shader_set_int(g_inst.shader, "uHasTex", 1);
+            g3d_shader_set_int(sp, "uTex", 0);
+            g3d_shader_set_int(sp, "uHasTex", 1);
         } else {
-            g3d_shader_set_int(g_inst.shader, "uHasTex", 0);
+            g3d_shader_set_int(sp, "uHasTex", 0);
         }
-        g3d_shader_set_float(g_inst.shader, "uWind", gr->wind);
+        if (gr->skinned && gr->skin_model) {
+            g3d_shader_set_mat4_array(sp, "uBones", gr->skin_model->joint_matrix, gr->skin_model->joint_count);
+            g3d_shader_set_vec3(sp, "uSkinOffset", vec3_make(gr->skin_model->skin_offset[0], gr->skin_model->skin_offset[1], gr->skin_model->skin_offset[2]));
+            g3d_shader_set_int(sp, "uBoneCount", gr->skin_model->joint_count);
+        } else {
+            g3d_shader_set_float(sp, "uWind", gr->wind);
+        }
 
         glDrawElementsInstanced(GL_TRIANGLES, gr->mesh->index_count,
                                 GL_UNSIGNED_INT, 0, vis);

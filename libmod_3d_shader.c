@@ -281,6 +281,20 @@ void g3d_shader_set_mat4(G3DShaderProgram *program, const char *name,
 #endif
 }
 
+/* Upload an array of Mat4 (contiguous, column-major) to a uniform array, e.g.
+   skeleton bone matrices for GPU skinning. */
+void g3d_shader_set_mat4_array(G3DShaderProgram *program, const char *name,
+                               const Mat4 *mats, int count) {
+    if (!program || !mats || count <= 0)
+        return;
+    int loc = g3d_shader_get_uniform(program, name);
+    if (loc < 0)
+        return;
+#ifndef VITA
+    glUniformMatrix4fv(loc, count, GL_FALSE, (const float *)mats);
+#endif
+}
+
 void g3d_shader_set_mat3(G3DShaderProgram *program, const char *name,
                          Mat4 mat) {
     if (!program)
