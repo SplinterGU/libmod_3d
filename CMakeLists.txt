@@ -99,6 +99,7 @@ set(SOURCES_LIBMOD_3D
     libmod_3d_physics.c
     libmod_3d_mirror.c
     libmod_3d_instance.c
+    libmod_3d_stream.c
     libmod_3d_prefab.c
     libmod_3d_scenefile.c
     libmod_3d_pick.c

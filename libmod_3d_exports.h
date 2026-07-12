@@ -178,6 +178,16 @@ int64_t g3d_model_submesh_lod_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_instances_set_wind_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_instances_set_alpha_cut_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_set_lod_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_world_rebase_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_stream_init_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_stream_update_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_stream_load_count_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_stream_load_x_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_stream_load_z_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_stream_unload_count_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_stream_unload_x_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_stream_unload_z_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_stream_loaded_count_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_instances_set_distance_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_instances_clear_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_instances_count_bgd(INSTANCE *my, int64_t *params);
@@ -473,6 +483,16 @@ DLSYSFUNCS __bgdexport(libmod_3d, functions_exports)[] = {
     FUNC("G3D_INSTANCES_SET_WIND", "IF", TYPE_INT, g3d_instances_set_wind_bgd),
     FUNC("G3D_INSTANCES_SET_ALPHA_CUT", "II", TYPE_INT, g3d_instances_set_alpha_cut_bgd),
     FUNC("G3D_SET_LOD", "F", TYPE_INT, g3d_set_lod_bgd),
+    FUNC("G3D_WORLD_REBASE", "FFF", TYPE_INT, g3d_world_rebase_bgd),
+    FUNC("G3D_STREAM_INIT", "FI", TYPE_INT, g3d_stream_init_bgd),
+    FUNC("G3D_STREAM_UPDATE", "FF", TYPE_INT, g3d_stream_update_bgd),
+    FUNC("G3D_STREAM_LOAD_COUNT", "", TYPE_INT, g3d_stream_load_count_bgd),
+    FUNC("G3D_STREAM_LOAD_X", "I", TYPE_INT, g3d_stream_load_x_bgd),
+    FUNC("G3D_STREAM_LOAD_Z", "I", TYPE_INT, g3d_stream_load_z_bgd),
+    FUNC("G3D_STREAM_UNLOAD_COUNT", "", TYPE_INT, g3d_stream_unload_count_bgd),
+    FUNC("G3D_STREAM_UNLOAD_X", "I", TYPE_INT, g3d_stream_unload_x_bgd),
+    FUNC("G3D_STREAM_UNLOAD_Z", "I", TYPE_INT, g3d_stream_unload_z_bgd),
+    FUNC("G3D_STREAM_LOADED_COUNT", "", TYPE_INT, g3d_stream_loaded_count_bgd),
     FUNC("G3D_INSTANCES_SET_DISTANCE", "IF", TYPE_INT, g3d_instances_set_distance_bgd),
     FUNC("G3D_INSTANCES_CLEAR", "I", TYPE_INT, g3d_instances_clear_bgd),
     FUNC("G3D_INSTANCES_COUNT", "I", TYPE_INT, g3d_instances_count_bgd),

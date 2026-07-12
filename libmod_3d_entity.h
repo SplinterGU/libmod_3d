@@ -52,6 +52,7 @@ typedef struct {
 int g3d_entity_impl_spawn(int scene_id, int model_id, float x, float y, float z);
 int g3d_entity_impl_destroy(int entity_id);
 int g3d_entity_impl_destroy_tree(int root_id, int free_materials);
+void g3d_entity_impl_rebase(float dx, float dy, float dz);   /* floating origin */
 G3DEntity *g3d_entity_impl_get(int entity_id);
 
 /* Transform */

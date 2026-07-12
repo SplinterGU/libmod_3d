@@ -24,6 +24,7 @@
 #include "libmod_3d_collide.h"
 #include "libmod_3d_mirror.h"
 #include "libmod_3d_instance.h"
+#include "libmod_3d_stream.h"
 #include "libmod_3d_prefab.h"
 #include "libmod_3d_scenefile.h"
 #include "libmod_3d_voxterrain.h"
@@ -1204,6 +1205,28 @@ int64_t g3d_set_lod_bgd(INSTANCE *my, int64_t *params) {
     g3d_instances_set_lod_distance(*(float *)&params[0]);
     return 1;
 }
+/* Floating origin: shift the whole world by (-dx,-dy,-dz) so coordinates stay
+   small far from the origin (float precision). The game calls this when the
+   camera drifts past a threshold, then offsets its own camera + bookkeeping. */
+int64_t g3d_world_rebase_bgd(INSTANCE *my, int64_t *params) {
+    g3d_entity_impl_rebase(*(float *)&params[0], *(float *)&params[1], *(float *)&params[2]);
+    return 1;
+}
+
+/* ---- world streaming (tile ring manager) ---- */
+int64_t g3d_stream_init_bgd(INSTANCE *my, int64_t *params) {
+    g3d_stream_init(*(float *)&params[0], (int)params[1]); return 1;
+}
+int64_t g3d_stream_update_bgd(INSTANCE *my, int64_t *params) {
+    g3d_stream_update(*(float *)&params[0], *(float *)&params[1]); return 1;
+}
+int64_t g3d_stream_load_count_bgd(INSTANCE *my, int64_t *params)   { return (int64_t)g3d_stream_load_count(); }
+int64_t g3d_stream_load_x_bgd(INSTANCE *my, int64_t *params)       { return (int64_t)g3d_stream_load_x((int)params[0]); }
+int64_t g3d_stream_load_z_bgd(INSTANCE *my, int64_t *params)       { return (int64_t)g3d_stream_load_z((int)params[0]); }
+int64_t g3d_stream_unload_count_bgd(INSTANCE *my, int64_t *params) { return (int64_t)g3d_stream_unload_count(); }
+int64_t g3d_stream_unload_x_bgd(INSTANCE *my, int64_t *params)     { return (int64_t)g3d_stream_unload_x((int)params[0]); }
+int64_t g3d_stream_unload_z_bgd(INSTANCE *my, int64_t *params)     { return (int64_t)g3d_stream_unload_z((int)params[0]); }
+int64_t g3d_stream_loaded_count_bgd(INSTANCE *my, int64_t *params) { return (int64_t)g3d_stream_loaded_count(); }
 
 int64_t g3d_instances_set_distance_bgd(INSTANCE *my, int64_t *params) {
     g3d_instances_set_distance((int)params[0], *(float *)&params[1]);

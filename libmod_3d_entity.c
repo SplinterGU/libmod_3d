@@ -67,6 +67,19 @@ int g3d_entity_impl_destroy(int entity_id) {
     return 1;
 }
 
+/* Floating origin: shift every root entity (children move with their parent) by
+   (-dx,-dy,-dz). The game calls this when the camera drifts far from the origin
+   so world coordinates stay small (float precision). Physics is rebased
+   separately (g3d_world_rebase). */
+void g3d_entity_impl_rebase(float dx, float dy, float dz) {
+    for (int i = 0; i < g_entity_count; i++) {
+        G3DEntity *e = &g_entities[i];
+        if (!e->active || e->parent_id >= 0) continue;   /* children follow roots */
+        e->position.x -= dx; e->position.y -= dy; e->position.z -= dz;
+        e->world_matrix_dirty = 1;
+    }
+}
+
 /* Destroy an entity and everything parented under it (recursively). If
    free_materials != 0 each destroyed entity's material is also released - use
    this for models spawned by g3d_model_spawn, whose per-submesh materials are
