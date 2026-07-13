@@ -38,6 +38,13 @@ typedef struct {
     void *wall_texture;   /* triplanar wall/rock texture for slopes & cave walls (G3DTexture*) */
 
     int triplanar;   /* 1 = voxel terrain: grass on flats, rock on slopes/walls */
+
+    int   biome;      /* 1 = procedural height/slope terrain biomes (streamed terrain) */
+    float biome_amp;  /* world height amplitude (band scale) */
+    float biome_sea;  /* sea level (world Y) */
+    void *biome_tex[4];    /* optional textures: [0]sand [1]grass [2]rock [3]snow (G3DTexture*) */
+    float biome_tex_scale; /* world-space UV tiling for the biome textures */
+
     int active;
 } G3DMaterial;
 
@@ -54,6 +61,8 @@ int g3d_material_impl_set_texture(int material_id, int texture_type, int texture
 /* Set a PBR map by pointer (type 1=normal, 2=metallic, 3=roughness). */
 int g3d_material_impl_set_map(int material_id, int type, void *texture);
 int g3d_material_impl_set_triplanar(int material_id, int on);
+int g3d_material_impl_set_biome(int material_id, int on, float amplitude, float sea_level);
+int g3d_material_impl_set_biome_textures(int material_id, void *sand, void *grass, void *rock, void *snow, float scale);
 
 /* Cleanup */
 void g3d_material_impl_shutdown(void);

@@ -25,6 +25,7 @@
 #include "libmod_3d_mirror.h"
 #include "libmod_3d_instance.h"
 #include "libmod_3d_stream.h"
+#include "libmod_3d_worldgen.h"
 #include "libmod_3d_prefab.h"
 #include "libmod_3d_scenefile.h"
 #include "libmod_3d_voxterrain.h"
@@ -503,6 +504,11 @@ int64_t g3d_model_load_gltf_bgd(INSTANCE *my, int64_t *params) {
     return (int64_t)(intptr_t)model;
 }
 
+int64_t g3d_gltf_set_recenter_bgd(INSTANCE *my, int64_t *params) {
+    g3d_gltf_set_recenter((int)params[0]);
+    return 1;
+}
+
 int64_t g3d_model_load_gltf_fractured_bgd(INSTANCE *my, int64_t *params) {
     g3d_ensure_init();
     const char *filename = (const char *)string_get(params[0]);
@@ -766,6 +772,11 @@ static G3DMesh *build_model_merged_lod(G3DModel *model, float s) {
     uint32_t tv = 0, ti = 0;
     for (uint32_t i = 0; i < model->mesh_count; i++) { tv += model->meshes[i].vertex_count; ti += model->meshes[i].index_count; }
     if (tv < 48 || ti < 3) return NULL;
+    /* Skip environment-scale models (whole maps): merging them would (a) alloc a
+       giant temporary buffer and (b) collapse the ENTIRE map to one blob whenever
+       the camera is far from the model origin -- which is always, inside a map.
+       Such models keep per-submesh culling + per-mesh LOD instead. */
+    if (tv > 1000000u || model->mesh_count > 512) return NULL;
     G3DVertex *verts = (G3DVertex *)malloc((size_t)tv * sizeof(G3DVertex));
     uint32_t *idx = (uint32_t *)malloc((size_t)ti * sizeof(uint32_t));
     if (!verts || !idx) { free(verts); free(idx); return NULL; }
@@ -817,6 +828,11 @@ int g3d_model_spawn(int scene_id, void *model_ptr, float x, float y, float z,
             void *alb = model->mesh_textures ? model->mesh_textures[j] : NULL;
             m->albedo_texture = alb;
             m->albedo_texture_id = alb ? 0 : -1;
+            /* Static map/prop geometry is matte: a glossy default (0.5) puts a
+               grazing specular sheen on flat ground toward the horizon that reads
+               as a bright "seam". High roughness keeps it flat and even. */
+            m->roughness = 0.9f;
+            m->metallic  = 0.0f;
             if (model->mesh_normal && model->mesh_normal[j])       g3d_material_impl_set_map(mat, 1, model->mesh_normal[j]);
             if (model->mesh_metallic && model->mesh_metallic[j])   g3d_material_impl_set_map(mat, 2, model->mesh_metallic[j]);
             if (model->mesh_roughness && model->mesh_roughness[j]) g3d_material_impl_set_map(mat, 3, model->mesh_roughness[j]);
@@ -1205,6 +1221,14 @@ int64_t g3d_set_lod_bgd(INSTANCE *my, int64_t *params) {
     g3d_instances_set_lod_distance(*(float *)&params[0]);
     return 1;
 }
+int64_t g3d_set_culling_bgd(INSTANCE *my, int64_t *params) {
+    g3d_renderer_set_frustum_culling((int)params[0]);
+    return 1;
+}
+int64_t g3d_set_backface_cull_bgd(INSTANCE *my, int64_t *params) {
+    g3d_renderer_set_backface_cull((int)params[0]);
+    return 1;
+}
 /* Floating origin: shift the whole world by (-dx,-dy,-dz) so coordinates stay
    small far from the origin (float precision). The game calls this when the
    camera drifts past a threshold, then offsets its own camera + bookkeeping. */
@@ -1227,6 +1251,34 @@ int64_t g3d_stream_unload_count_bgd(INSTANCE *my, int64_t *params) { return (int
 int64_t g3d_stream_unload_x_bgd(INSTANCE *my, int64_t *params)     { return (int64_t)g3d_stream_unload_x((int)params[0]); }
 int64_t g3d_stream_unload_z_bgd(INSTANCE *my, int64_t *params)     { return (int64_t)g3d_stream_unload_z((int)params[0]); }
 int64_t g3d_stream_loaded_count_bgd(INSTANCE *my, int64_t *params) { return (int64_t)g3d_stream_loaded_count(); }
+
+/* ---- procedural world generation ---- */
+int64_t g3d_worldgen_set_bgd(INSTANCE *my, int64_t *params) {
+    g3d_worldgen_set((int)params[0], *(float *)&params[1], *(float *)&params[2], *(float *)&params[3]);
+    return 1;
+}
+int64_t g3d_worldgen_height_bgd(INSTANCE *my, int64_t *params) {
+    float v = g3d_worldgen_height(*(float *)&params[0], *(float *)&params[1]);
+    return (int64_t) * (int32_t *)&v;
+}
+int64_t g3d_worldgen_tile_bgd(INSTANCE *my, int64_t *params) {
+    return (int64_t)g3d_worldgen_tile((int)params[0], (int)params[1], (int)params[2],
+                                      *(float *)&params[3], (int)params[4],
+                                      *(float *)&params[5], *(float *)&params[6],
+                                      (void *)(intptr_t)params[7]);
+}
+int64_t g3d_worldgen_tile_free_bgd(INSTANCE *my, int64_t *params) {
+    g3d_worldgen_tile_free((int)params[0]); return 1;
+}
+int64_t g3d_worldgen_set_water_depth_bgd(INSTANCE *my, int64_t *params) {
+    g3d_worldgen_set_water_depth(*(float *)&params[0]); return 1;
+}
+int64_t g3d_worldgen_set_biome_textures_bgd(INSTANCE *my, int64_t *params) {
+    g3d_worldgen_set_biome_textures((void *)(intptr_t)params[0], (void *)(intptr_t)params[1],
+                                    (void *)(intptr_t)params[2], (void *)(intptr_t)params[3],
+                                    *(float *)&params[4]);
+    return 1;
+}
 
 int64_t g3d_instances_set_distance_bgd(INSTANCE *my, int64_t *params) {
     g3d_instances_set_distance((int)params[0], *(float *)&params[1]);

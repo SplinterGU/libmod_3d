@@ -43,6 +43,10 @@ extern "C" {
  */
 G3DModel *g3d_gltf_load(const char *filepath);
 
+/* Toggle X/Z re-centering of loaded models (default on). Turn OFF before loading
+   world/map sectors whose geometry is baked at absolute world coordinates. */
+void g3d_gltf_set_recenter(int on);
+
 /* Fracture loader: one submesh per NODE (not per material). A pre-fractured
    model whose chunks share one material comes in as N separate submeshes, each
    keeping its chunk's world position (submesh AABB centre = chunk centroid).

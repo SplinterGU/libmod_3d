@@ -440,6 +440,7 @@ uniform float uRoughness;
 uniform vec3 uCameraPosition;
 uniform vec3 uAmbientLight;
 uniform float uAmbientIntensity;
+uniform int uFlipWinding;   // 1 when the GRAPH render flips Y (inverts winding)
 
 // Directional Light
 uniform vec3 uLightDirection;
@@ -486,7 +487,34 @@ uniform int uTriplanar;
 uniform sampler2D uWallTexture;
 uniform int uHasWallTex;
 
+// Procedural terrain biomes: colour by world height + slope (sand -> grass ->
+// rock -> snow, dark basalt + glowing lava on volcano peaks). No textures, no
+// per-vertex data: the streamed terrain sets uBiome=1 and this paints itself.
+uniform int   uBiome;
+uniform float uBiomeAmp;   // world height scale (band thresholds are fractions of it)
+uniform float uBiomeSea;   // sea level (world Y) subtracted from the height
+// optional real textures per band (each band independently textured or flat)
+uniform int       uHasBiomeTex;
+uniform float     uBiomeTexScale;
+uniform vec4      uBiomeTexMask;    // per band: 1 = use texture, 0 = flat colour
+uniform sampler2D uBiomeSand;
+uniform sampler2D uBiomeGrass;
+uniform sampler2D uBiomeRock;
+uniform sampler2D uBiomeSnow;
+
 out vec4 FragColor;
+
+// cheap value noise for breaking up the flat colour bands
+float biomeHash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+float biomeNoise(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = biomeHash(i), b = biomeHash(i + vec2(1,0));
+    float c = biomeHash(i + vec2(0,1)), d = biomeHash(i + vec2(1,1));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
 
 float calculateShadow() {
     if (uCastShadow == 0) return 0.0;
@@ -625,10 +653,58 @@ void main() {
         albedo = mix(albedo, rock, smoothstep(0.35, 0.72, slope));
     }
 
+    // ---- Procedural terrain biomes (height + slope) ----
+    float biomeLava = 0.0;
+    if (uBiome == 1) {
+        vec3 wp = fs_in.position;
+        float amp = max(uBiomeAmp, 1.0);
+        float r   = (wp.y - uBiomeSea) / amp;          // height in amplitude units
+        vec3  gN  = normalize(fs_in.normal);
+        float slope = 1.0 - clamp(gN.y, 0.0, 1.0);     // 0 flat -> 1 vertical
+
+        // per-fragment noise so bands aren't perfectly flat
+        float nz = biomeNoise(wp.xz * 0.02) * 0.5 + biomeNoise(wp.xz * 0.08) * 0.5;
+        r += (nz - 0.5) * 0.12;
+
+        // Per-band base colour: flat procedural, overridden by a texture where one
+        // is supplied (each band independent, so you can texture only some).
+        vec3 sand  = vec3(0.80, 0.74, 0.53);
+        vec3 grass = mix(vec3(0.28, 0.46, 0.20), vec3(0.20, 0.37, 0.15), nz);
+        vec3 rock  = mix(vec3(0.46, 0.42, 0.37), vec3(0.36, 0.32, 0.29), nz);
+        vec3 snow  = vec3(0.94, 0.95, 0.99);
+        if (uHasBiomeTex == 1) {
+            vec2 tuv = wp.xz * uBiomeTexScale;
+            if (uBiomeTexMask.x > 0.5) sand  = texture(uBiomeSand,  tuv).rgb;
+            if (uBiomeTexMask.y > 0.5) grass = texture(uBiomeGrass, tuv).rgb;
+            if (uBiomeTexMask.z > 0.5) rock  = texture(uBiomeRock,  tuv).rgb;
+            if (uBiomeTexMask.w > 0.5) snow  = texture(uBiomeSnow,  tuv).rgb;
+        }
+
+        vec3 col = sand;
+        col = mix(col, grass, smoothstep(0.06, 0.16, r));
+        col = mix(col, rock,  smoothstep(0.55, 0.95, r));
+        col = mix(col, snow,  smoothstep(1.15, 1.45, r));
+        // steep faces are always rock (no grass/snow clinging to cliffs)
+        col = mix(col, rock, smoothstep(0.50, 0.75, slope));
+
+        // volcanoes: only the ridged peaks climb this high -> dark basalt, then
+        // glowing lava right at the summit.
+        col = mix(col, vec3(0.12, 0.10, 0.10), smoothstep(1.60, 1.95, r));
+        biomeLava = smoothstep(2.30, 2.85, r);
+        col = mix(col, vec3(1.00, 0.35, 0.06), biomeLava);
+
+        albedo = col;
+    }
+
     vec3 normal = normalize(fs_in.normal);
     vec3 viewDir = normalize(uCameraPosition - fs_in.position);
-    // Two-sided shading: flip the normal to face the camera.
-    if (dot(normal, viewDir) < 0.0) normal = -normal;
+    // Two-sided shading: flip the normal on genuine BACK faces, decided by the
+    // triangle winding (gl_FrontFacing), NOT the view angle. The old view-angle
+    // test flipped grazing FRONT faces too, so a large flat ground seen from near
+    // ground level flipped to face-down right at eye level -> a hard dark seam along
+    // the horizon. flip_y (GRAPH render) inverts winding, so correct for it.
+    bool frontFace = (uFlipWinding == 1) ? (!gl_FrontFacing) : gl_FrontFacing;
+    if (!frontFace) normal = -normal;
 
     // Tangent-space normal map WITHOUT precomputed tangents: build the TBN from the
     // screen-space derivatives of position and UV (Schuler's cotangent frame).
@@ -713,6 +789,9 @@ void main() {
     vec3 iblSpec = env * Fenv * (1.0 - rough * 0.6);
     vec3 result = iblDiff + iblSpec + Lo;
 
+    // Lava glows (emissive) so volcano summits stay bright even in shadow.
+    result += vec3(1.0, 0.32, 0.05) * biomeLava * 2.2;
+
     // Apply fog
     float fogFactor = calculateFog();
     result = mix(uFogColor, result, fogFactor);
@@ -785,6 +864,7 @@ uniform vec3 uAlbedoColor;
 uniform vec3 uCameraPosition;
 uniform vec3 uAmbientLight;
 uniform float uAmbientIntensity;
+uniform int uFlipWinding;   // 1 when the GRAPH render flips Y (inverts winding)
 
 uniform vec3 uLightDirection;
 uniform vec3 uLightColor;

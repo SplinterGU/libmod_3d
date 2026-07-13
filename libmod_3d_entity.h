@@ -46,6 +46,11 @@ typedef struct {
     void *lod_mesh;
     int lod_material;
     int lod_far;
+
+    /* Opt out of the automatic per-mesh LOD decimation. Terrain tiles set this:
+       their borders must stay full-res so neighbouring tiles keep matching
+       (decimating them opens cracks along the tile grid at distance). */
+    int lod_exempt;
 } G3DEntity;
 
 /* Entity lifecycle */

@@ -257,6 +257,13 @@ static G3DMesh *build_submesh(cgltf_data *data, cgltf_material *target,
 /* Center the model on X/Z, rest it on Y=0 (feet at origin) and (re)upload all
    submeshes. Shared by load and orient. If out_off != NULL it receives the
    applied offset (used by skinned models, whose bind_pos stays un-offset). */
+/* When 0, loaded models keep their ORIGINAL vertex coordinates instead of being
+   re-centered on X/Z and dropped to Y=0. Streamed world/map sectors need this:
+   their geometry is baked at absolute world positions, so re-centering each
+   sector to the origin would pile every sector on top of each other. */
+static int g_gltf_recenter = 1;
+void g3d_gltf_set_recenter(int on) { g_gltf_recenter = on ? 1 : 0; }
+
 static void model_recenter_upload_off(G3DMesh *meshes, int sub, float *out_off) {
     if (sub <= 0)
         return;
@@ -272,6 +279,7 @@ static void model_recenter_upload_off(G3DMesh *meshes, int sub, float *out_off) 
         }
     }
     float off[3] = { -0.5f * (mn[0] + mx[0]), -mn[1], -0.5f * (mn[2] + mx[2]) };
+    if (!g_gltf_recenter) { off[0] = off[1] = off[2] = 0.0f; }   /* keep absolute coords (sectors) */
     for (int s = 0; s < sub; s++) {
         G3DMesh *m = &meshes[s];
         for (uint32_t v = 0; v < m->vertex_count; v++) {

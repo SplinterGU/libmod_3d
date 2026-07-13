@@ -322,6 +322,9 @@ void g3d_renderer_set_frustum_culling(int enabled) {
     g_renderer.frustum_culling_enabled = enabled;
 }
 
+static int g_backface_cull = 0;
+void g3d_renderer_set_backface_cull(int enabled) { g_backface_cull = enabled ? 1 : 0; }
+
 /* ============================================================================
    FRAME RENDERING
    ============================================================================
@@ -359,7 +362,16 @@ void g3d_renderer_begin_frame(void) {
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
-    glDisable(GL_CULL_FACE);
+    /* Backface culling is OFF by default (everything is two-sided). Maps with
+       single-sided quads (GTA-style signs) enable it so you don't see mirrored
+       backs. flip_y (GRAPH render) inverts winding, so pick the front face to match. */
+    if (g_backface_cull) {
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glFrontFace(g_renderer.flip_y ? GL_CW : GL_CCW);
+    } else {
+        glDisable(GL_CULL_FACE);
+    }
 
     /* Re-apply our clear color (SDL_gpu may have reset it) and clear */
     glClearColor(g_renderer.clear_color[0], g_renderer.clear_color[1],
@@ -1252,7 +1264,7 @@ void g3d_renderer_forward_pass(void) {
         /* Automatic LOD: far entities render their auto-generated low-poly mesh.
            Same global g3d_set_lod distance as instanced objects; no game code. */
         void *drawmesh = entity->mesh;
-        if (lodd > 0.0f) {
+        if (lodd > 0.0f && !entity->lod_exempt) {
             float ex = world_matrix.m[12] - camera->position.x;
             float ey = world_matrix.m[13] - camera->position.y;
             float ez = world_matrix.m[14] - camera->position.z;
@@ -1404,6 +1416,32 @@ void g3d_renderer_render_mesh(void *mesh, void *material, Mat4 model_matrix,
         if (albedo_tex && albedo_tex->gl_handle)
             albedo_gl = albedo_tex->gl_handle;
         g3d_shader_set_int(shader, "uTriplanar", g3d_material->triplanar);
+        g3d_shader_set_int(shader, "uBiome", g3d_material->biome);
+        g3d_shader_set_float(shader, "uBiomeAmp", g3d_material->biome_amp);
+        g3d_shader_set_float(shader, "uBiomeSea", g3d_material->biome_sea);
+        /* Optional per-biome textures on units 11..14 (sand/grass/rock/snow). Each
+           band is independent: bands without a texture keep the flat colour, and
+           their unit gets the default white texture so the sampler stays valid. */
+        const char *bn[4] = { "uBiomeSand", "uBiomeGrass", "uBiomeRock", "uBiomeSnow" };
+        float bmask[4] = { 0, 0, 0, 0 };
+        int any_biome_tex = 0;
+        if (g3d_material->biome) {
+            for (int b = 0; b < 4; b++) {
+                G3DTexture *bt = (G3DTexture *)g3d_material->biome_tex[b];
+                GLuint h = (bt && bt->gl_handle) ? bt->gl_handle : g_renderer.default_white_tex;
+                if (bt && bt->gl_handle) { bmask[b] = 1.0f; any_biome_tex = 1; }
+                glActiveTexture(GL_TEXTURE11 + b);
+                glBindTexture(GL_TEXTURE_2D, h);
+                g3d_shader_set_sampler2d(shader, bn[b], 11 + b);
+            }
+            glActiveTexture(GL_TEXTURE0);
+        }
+        g3d_shader_set_int(shader, "uHasBiomeTex", any_biome_tex);
+        if (any_biome_tex) {
+            g3d_shader_set_float(shader, "uBiomeTexScale", g3d_material->biome_tex_scale);
+            g3d_shader_set_vec4(shader, "uBiomeTexMask",
+                                vec4_make(bmask[0], bmask[1], bmask[2], bmask[3]));
+        }
         G3DTexture *wall_tex = (G3DTexture *)g3d_material->wall_texture;
         if (g3d_material->triplanar && wall_tex && wall_tex->gl_handle) {
             glActiveTexture(GL_TEXTURE3);
@@ -1431,6 +1469,8 @@ void g3d_renderer_render_mesh(void *mesh, void *material, Mat4 model_matrix,
         g3d_shader_set_float(shader, "uMetallic", 0.0f);
         g3d_shader_set_float(shader, "uRoughness", 0.5f);
         g3d_shader_set_int(shader, "uTriplanar", 0);
+        g3d_shader_set_int(shader, "uBiome", 0);
+        g3d_shader_set_int(shader, "uHasBiomeTex", 0);
         g3d_shader_set_int(shader, "uHasWallTex", 0);
         g3d_shader_set_int(shader, "uHasNormalMap", 0);
         g3d_shader_set_int(shader, "uHasMetalMap", 0);
@@ -1452,6 +1492,9 @@ void g3d_renderer_render_mesh(void *mesh, void *material, Mat4 model_matrix,
     /* Camera position for specular */
     Vec3 cam_pos = g_renderer.active_camera->position;
     g3d_shader_set_vec3(shader, "uCameraPosition", cam_pos);
+    /* GRAPH render (flip_y) inverts triangle winding -> tell the shader so its
+       gl_FrontFacing two-sided normal flip stays correct. */
+    g3d_shader_set_int(shader, "uFlipWinding", g_renderer.flip_y);
 
     /* Get lights from active scene */
     int light_count = 0;
@@ -1614,6 +1657,13 @@ void g3d_renderer_set_fog(int enabled, Vec3 color, float start, float end) {
     g_renderer.fog_color[2] = color.z;
     g_renderer.fog_start = start;
     g_renderer.fog_end = end;
+}
+
+void g3d_renderer_get_fog(int *enabled, Vec3 *color, float *start, float *end) {
+    if (enabled) *enabled = g_renderer.fog_enabled;
+    if (color)   *color   = vec3_make(g_renderer.fog_color[0], g_renderer.fog_color[1], g_renderer.fog_color[2]);
+    if (start)   *start   = g_renderer.fog_start;
+    if (end)     *end     = g_renderer.fog_end;
 }
 
 void g3d_renderer_set_ambient_light(Vec3 color, float intensity) {
