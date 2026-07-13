@@ -36,21 +36,6 @@
 #include <SDL.h>
 #include "SDL_gpu.h"
 #include "xstrings.h"
-
-/* libbggfx already EXPORTS its process-local table (alpha, color_r/g/b, ...).
-   We only READ it from here (no BennuGD2 source is modified) so 3D entities can
-   obey the same `alpha`/`color_*` locals the 2D painter uses. Looked up by NAME
-   to stay robust to enum order. */
-extern DLVARFIXUP libbggfx_locals_fixup[];
-
-static uint8_t *bggfx_local_byte(INSTANCE *my, const char *name) {
-    if (!my || !my->locdata) return NULL;
-    for (int i = 0; libbggfx_locals_fixup[i].var; i++)
-        if (strcmp(libbggfx_locals_fixup[i].var, name) == 0)
-            return (uint8_t *)(intptr_t)my->locdata
-                 + (uint64_t)(intptr_t)libbggfx_locals_fixup[i].data_offset;
-    return NULL;
-}
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -89,10 +74,17 @@ enum {
     LOC3D_INTENSITY,
     LOC3D_RANGE,
     LOC3D_CONE_ANGLE,
+    LOC3D_ALPHA,
     LOC3D_COLORR,
     LOC3D_COLORG,
-    LOC3D_COLORB
-
+    LOC3D_COLORB,
+    LOC3D_BLENDMODE,
+    LOC3D_BLEND_SRC_RGB,
+    LOC3D_BLEND_DST_RGB,
+    LOC3D_BLEND_SRC_ALPHA,
+    LOC3D_BLEND_DST_ALPHA,
+    LOC3D_BLEND_EQ_RGB,
+    LOC3D_BLEND_EQ_ALPHA
 };
 
 DLVARFIXUP __bgdexport(libmod_3d, locals_fixup)[] = {
@@ -115,6 +107,20 @@ DLVARFIXUP __bgdexport(libmod_3d, locals_fixup)[] = {
     { "intensity" , NULL, -1, -1 },
     { "range"     , NULL, -1, -1 },
     { "cone_angle", NULL, -1, -1 },
+    /* BennuGD's per-graphic locals (declared by libbggfx) - resolved by NAME to
+       the SAME process storage, so g3d entities can obey the standard alpha /
+       color / blend locals with the normal LOCBYTE/LOCINT64 macros. */
+    { "alpha"     , NULL, -1, -1 },
+    { "color_r"   , NULL, -1, -1 },
+    { "color_g"   , NULL, -1, -1 },
+    { "color_b"   , NULL, -1, -1 },
+    { "blendmode" , NULL, -1, -1 },
+    { "custom_blendmode.src_rgb"       , NULL, -1, -1 },
+    { "custom_blendmode.dst_rgb"       , NULL, -1, -1 },
+    { "custom_blendmode.src_alpha"     , NULL, -1, -1 },
+    { "custom_blendmode.dst_alpha"     , NULL, -1, -1 },
+    { "custom_blendmode.equation_rgb"  , NULL, -1, -1 },
+    { "custom_blendmode.equation_alpha", NULL, -1, -1 },
     { NULL        , NULL, -1, -1 }
 };
 
@@ -301,16 +307,17 @@ int64_t g3d_entity_set_blend_bgd(INSTANCE *my, int64_t *params) {
    alpha/colour/blend with zero extra bookkeeping:  g3d_entity_use_locals(myent); */
 int64_t g3d_entity_use_locals_bgd(INSTANCE *my, int64_t *params) {
     int entity_id = (int)params[0];
-    uint8_t *a = bggfx_local_byte(my, "alpha");
-    uint8_t *r = bggfx_local_byte(my, "color_r");
-    uint8_t *g = bggfx_local_byte(my, "color_g");
-    uint8_t *b = bggfx_local_byte(my, "color_b");
-    int64_t *bm = (int64_t *)bggfx_local_byte(my, "blendmode");
-    if (a) g3d_entity_impl_set_alpha(entity_id, (float)(*a) / 255.0f);
-    if (r && g && b)
-        g3d_entity_impl_set_color(entity_id, (float)(*r) / 255.0f,
-                                  (float)(*g) / 255.0f, (float)(*b) / 255.0f);
-    if (bm) g3d_entity_impl_set_blend(entity_id, (int)(*bm));
+    if (LOCEXISTS(libmod_3d, LOC3D_ALPHA))
+        g3d_entity_impl_set_alpha(entity_id,
+                                  (float)LOCBYTE(libmod_3d, my, LOC3D_ALPHA) / 255.0f);
+    if (LOCEXISTS(libmod_3d, LOC3D_COLORR))
+        g3d_entity_impl_set_color(entity_id,
+                                  (float)LOCBYTE(libmod_3d, my, LOC3D_COLORR) / 255.0f,
+                                  (float)LOCBYTE(libmod_3d, my, LOC3D_COLORG) / 255.0f,
+                                  (float)LOCBYTE(libmod_3d, my, LOC3D_COLORB) / 255.0f);
+    if (LOCEXISTS(libmod_3d, LOC3D_BLENDMODE))
+        g3d_entity_impl_set_blend(entity_id,
+                                  (int)LOCINT64(libmod_3d, my, LOC3D_BLENDMODE));
     return 1;
 }
 
@@ -2001,11 +2008,28 @@ static void g3d_process_instance_hook( INSTANCE * i ) {
     float tz = (float) LOCDOUBLE( libmod_3d, i, LOC3D_TARGET_Z );
 
     switch ( csubtype ) {
-        case 1: /* C3D_ENTITY */
+        case 1: { /* C3D_ENTITY */
             g3d_entity_impl_set_position( entity_id, px, py, pz );
             g3d_entity_impl_set_rotation( entity_id, rx, ry, rz );
             g3d_entity_impl_set_scale(    entity_id, fsx, fsy, fsz );
+            /* Standard BennuGD per-graphic locals -> obeyed automatically. */
+            g3d_entity_impl_set_alpha( entity_id, LOCBYTE( libmod_3d, i, LOC3D_ALPHA ) / 255.0f );
+            g3d_entity_impl_set_color( entity_id,
+                                       LOCBYTE( libmod_3d, i, LOC3D_COLORR ) / 255.0f,
+                                       LOCBYTE( libmod_3d, i, LOC3D_COLORG ) / 255.0f,
+                                       LOCBYTE( libmod_3d, i, LOC3D_COLORB ) / 255.0f );
+            int bmode = (int) LOCINT64( libmod_3d, i, LOC3D_BLENDMODE );
+            g3d_entity_impl_set_blend( entity_id, bmode );
+            if ( bmode == G3D_BLEND_CUSTOM )
+                g3d_entity_impl_set_blend_custom( entity_id,
+                    (int) LOCINT64( libmod_3d, i, LOC3D_BLEND_SRC_RGB ),
+                    (int) LOCINT64( libmod_3d, i, LOC3D_BLEND_DST_RGB ),
+                    (int) LOCINT64( libmod_3d, i, LOC3D_BLEND_SRC_ALPHA ),
+                    (int) LOCINT64( libmod_3d, i, LOC3D_BLEND_DST_ALPHA ),
+                    (int) LOCINT64( libmod_3d, i, LOC3D_BLEND_EQ_RGB ),
+                    (int) LOCINT64( libmod_3d, i, LOC3D_BLEND_EQ_ALPHA ) );
             break;
+        }
         case 2: { /* C3D_LIGHT */
             g3d_light_impl_set_position( entity_id, px, py, pz );
 

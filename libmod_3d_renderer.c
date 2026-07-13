@@ -330,31 +330,61 @@ void g3d_renderer_set_backface_cull(int enabled) { g_backface_cull = enabled ? 1
 static float g_draw_opacity = 1.0f;
 static float g_draw_tint[3] = { 1.0f, 1.0f, 1.0f };
 
-/* Non-normal blend modes (ADD/MULTIPLY/SUBTRACT) must go through the transparent
-   pass even at full alpha. Values match BennuGD's blend_mode (g_blit.h). */
+/* A real blend mode (anything except NONE/NORMAL/DISABLED) must go through the
+   transparent pass even at full alpha (e.g. additive glow). */
 static int blend_is_special(int mode) {
-    return (mode == 3 /*MULTIPLY*/ || mode == 4 /*ADD*/ || mode == 5 /*SUBTRACT*/);
+    return !(mode == G3D_BLEND_NORMAL || mode == G3D_BLEND_NONE ||
+             mode == G3D_BLEND_DISABLED);
 }
 #ifndef VITA
-static void apply_entity_blend(int mode) {
-    switch (mode) {
-        case 4: /* ADD: fire, glow, lights (alpha scales intensity) */
-            glBlendEquation(GL_FUNC_ADD);
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-            break;
-        case 3: /* MULTIPLY: shadows, colour filters */
-            glBlendEquation(GL_FUNC_ADD);
-            glBlendFunc(GL_DST_COLOR, GL_ZERO);
-            break;
-        case 5: /* SUBTRACT */
-            glBlendEquation(GL_FUNC_REVERSE_SUBTRACT);
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-            break;
-        default: /* NORMAL alpha */
-            glBlendEquation(GL_FUNC_ADD);
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-            break;
+/* Set the GL blend state for an entity, replicating BennuGD's 2D blend modes
+   (same src/dst factors + equation as gr_set_blend), incl. CUSTOM. */
+static void apply_entity_blend(const G3DEntity *e) {
+    int srgb, drgb, salpha, dalpha, ergb = GL_FUNC_ADD, ealpha = GL_FUNC_ADD;
+    switch (e->blend_mode) {
+        case G3D_BLEND_PREMULTIPLIED_ALPHA:
+            srgb = GL_ONE;       drgb = GL_ONE_MINUS_SRC_ALPHA;
+            salpha = GL_ONE;     dalpha = GL_ONE_MINUS_SRC_ALPHA; break;
+        case G3D_BLEND_MULTIPLY:
+            srgb = GL_DST_COLOR; drgb = GL_ZERO;
+            salpha = GL_SRC_ALPHA; dalpha = GL_ONE_MINUS_SRC_ALPHA; break;
+        case G3D_BLEND_ADD:
+            srgb = GL_SRC_ALPHA; drgb = GL_ONE;
+            salpha = GL_SRC_ALPHA; dalpha = GL_ONE; break;
+        case G3D_BLEND_SUBTRACT:
+            srgb = GL_ONE;       drgb = GL_ONE;   ergb = GL_FUNC_SUBTRACT;
+            salpha = GL_ONE;     dalpha = GL_ONE; ealpha = GL_FUNC_SUBTRACT; break;
+        case G3D_BLEND_MOD_ALPHA:
+            srgb = GL_ZERO;      drgb = GL_ONE;
+            salpha = GL_ZERO;    dalpha = GL_SRC_ALPHA; break;
+        case G3D_BLEND_SET_ALPHA:
+            srgb = GL_ZERO;      drgb = GL_ONE;
+            salpha = GL_ONE;     dalpha = GL_ZERO; break;
+        case G3D_BLEND_SET:
+            srgb = GL_ONE;       drgb = GL_ZERO;
+            salpha = GL_ONE;     dalpha = GL_ZERO; break;
+        case G3D_BLEND_NORMAL_KEEP_ALPHA:
+            srgb = GL_SRC_ALPHA; drgb = GL_ONE_MINUS_SRC_ALPHA;
+            salpha = GL_ZERO;    dalpha = GL_ONE; break;
+        case G3D_BLEND_NORMAL_ADD_ALPHA:
+            srgb = GL_SRC_ALPHA; drgb = GL_ONE_MINUS_SRC_ALPHA;
+            salpha = GL_ONE;     dalpha = GL_ONE; break;
+        case G3D_BLEND_NORMAL_FACTOR_ALPHA:
+            srgb = GL_SRC_ALPHA; drgb = GL_ONE_MINUS_SRC_ALPHA;
+            salpha = GL_ONE_MINUS_DST_ALPHA; dalpha = GL_ONE; break;
+        case G3D_BLEND_ALPHA_MASK:
+            srgb = GL_ZERO;      drgb = GL_ONE;
+            salpha = GL_ZERO;    dalpha = GL_ONE_MINUS_SRC_ALPHA; break;
+        case G3D_BLEND_CUSTOM:  /* raw GL enums from the process' custom_blendmode */
+            srgb = e->blend_custom[0]; drgb = e->blend_custom[1];
+            salpha = e->blend_custom[2]; dalpha = e->blend_custom[3];
+            ergb = e->blend_custom[4];   ealpha = e->blend_custom[5]; break;
+        default: /* NORMAL / NONE / DISABLED -> standard alpha */
+            srgb = GL_SRC_ALPHA; drgb = GL_ONE_MINUS_SRC_ALPHA;
+            salpha = GL_SRC_ALPHA; dalpha = GL_ONE_MINUS_SRC_ALPHA; break;
     }
+    glBlendEquationSeparate(ergb, ealpha);
+    glBlendFuncSeparate(srgb, drgb, salpha, dalpha);
 }
 #endif
 
@@ -1218,7 +1248,7 @@ static void draw_scene_entities(G3DCamera *camera, int *entities, int entity_cou
         g_draw_tint[1] = entity->tint[1];
         g_draw_tint[2] = entity->tint[2];
 #ifndef VITA
-        if (want_transparent) apply_entity_blend(entity->blend_mode);
+        if (want_transparent) apply_entity_blend(entity);
 #endif
 
         /* Get entity's world matrix */
