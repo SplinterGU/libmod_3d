@@ -322,6 +322,42 @@ void g3d_renderer_set_frustum_culling(int enabled) {
     g_renderer.frustum_culling_enabled = enabled;
 }
 
+static int g_backface_cull = 0;
+void g3d_renderer_set_backface_cull(int enabled) { g_backface_cull = enabled ? 1 : 0; }
+
+/* Opacity + RGB tint for the mesh currently being drawn (set per entity by the
+   forward pass; read by render_mesh -> uOpacity / uEntityColor). */
+static float g_draw_opacity = 1.0f;
+static float g_draw_tint[3] = { 1.0f, 1.0f, 1.0f };
+
+/* Non-normal blend modes (ADD/MULTIPLY/SUBTRACT) must go through the transparent
+   pass even at full alpha. Values match BennuGD's blend_mode (g_blit.h). */
+static int blend_is_special(int mode) {
+    return (mode == 3 /*MULTIPLY*/ || mode == 4 /*ADD*/ || mode == 5 /*SUBTRACT*/);
+}
+#ifndef VITA
+static void apply_entity_blend(int mode) {
+    switch (mode) {
+        case 4: /* ADD: fire, glow, lights (alpha scales intensity) */
+            glBlendEquation(GL_FUNC_ADD);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+            break;
+        case 3: /* MULTIPLY: shadows, colour filters */
+            glBlendEquation(GL_FUNC_ADD);
+            glBlendFunc(GL_DST_COLOR, GL_ZERO);
+            break;
+        case 5: /* SUBTRACT */
+            glBlendEquation(GL_FUNC_REVERSE_SUBTRACT);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+            break;
+        default: /* NORMAL alpha */
+            glBlendEquation(GL_FUNC_ADD);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            break;
+    }
+}
+#endif
+
 /* ============================================================================
    FRAME RENDERING
    ============================================================================
@@ -359,7 +395,16 @@ void g3d_renderer_begin_frame(void) {
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
-    glDisable(GL_CULL_FACE);
+    /* Backface culling is OFF by default (everything is two-sided). Maps with
+       single-sided quads (GTA-style signs) enable it so you don't see mirrored
+       backs. flip_y (GRAPH render) inverts winding, so pick the front face to match. */
+    if (g_backface_cull) {
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glFrontFace(g_renderer.flip_y ? GL_CW : GL_CCW);
+    } else {
+        glDisable(GL_CULL_FACE);
+    }
 
     /* Re-apply our clear color (SDL_gpu may have reset it) and clear */
     glClearColor(g_renderer.clear_color[0], g_renderer.clear_color[1],
@@ -1151,43 +1196,30 @@ void g3d_renderer_reflection_pass_plane(float px, float py, float pz,
 #endif
 }
 
-void g3d_renderer_forward_pass(void) {
-    if (!g_renderer.initialized || !g_renderer.active_camera)
-        return;
-
-    G3DCamera *camera = g_renderer.active_camera;
-    g3d_camera_update(camera);
-
-    if (g_renderer.frustum_culling_enabled) {
-        g3d_camera_update_frustum(camera);
-    }
-
-    /* Bind target framebuffer (0 = screen, or a GRAPH-backed FBO) */
-#ifndef VITA
-    glBindFramebuffer(GL_FRAMEBUFFER, g_renderer.framebuffer);
-    if (g_renderer.framebuffer == g_renderer.target_fbo) {
-        glViewport(g_renderer.vp_x, g_renderer.vp_y, g_renderer.vp_w, g_renderer.vp_h);
-    } else {
-        glViewport(0, 0, g_renderer.display_width, g_renderer.display_height);
-    }
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LEQUAL);
-#endif
-
-    /* Get all entities in active scene */
-    int entity_count = 0;
-    int *entities = g3d_scene_impl_get_entities(&entity_count);
-
-    if (!entities || entity_count == 0)
-        return;
-
-    /* Render each entity */
+/* Draw the scene's entities, filtered by transparency (want_transparent: 0 =
+   opaque only, 1 = transparent only). Shared by the opaque forward pass and the
+   later transparent pass (which runs AFTER the sky so blended objects aren't
+   overwritten by the sky where there's no opaque geometry behind them). */
+static void draw_scene_entities(G3DCamera *camera, int *entities, int entity_count,
+                                int want_transparent) {
     for (int i = 0; i < entity_count; i++) {
         int entity_id = entities[i];
         G3DEntity *entity = g3d_entity_impl_get(entity_id);
 
         if (!entity || !entity->active)
             continue;
+
+        /* Route to the matching pass and carry the opacity/tint to the shader.
+           Special blend modes (add/multiply/subtract) always need the blend pass. */
+        int is_transparent = (entity->opacity < 0.996f) || blend_is_special(entity->blend_mode);
+        if (is_transparent != want_transparent) continue;
+        g_draw_opacity = entity->opacity;
+        g_draw_tint[0] = entity->tint[0];
+        g_draw_tint[1] = entity->tint[1];
+        g_draw_tint[2] = entity->tint[2];
+#ifndef VITA
+        if (want_transparent) apply_entity_blend(entity->blend_mode);
+#endif
 
         /* Get entity's world matrix */
         Mat4 world_matrix = g3d_entity_impl_get_world_matrix(entity_id);
@@ -1252,7 +1284,7 @@ void g3d_renderer_forward_pass(void) {
         /* Automatic LOD: far entities render their auto-generated low-poly mesh.
            Same global g3d_set_lod distance as instanced objects; no game code. */
         void *drawmesh = entity->mesh;
-        if (lodd > 0.0f) {
+        if (lodd > 0.0f && !entity->lod_exempt) {
             float ex = world_matrix.m[12] - camera->position.x;
             float ey = world_matrix.m[13] - camera->position.y;
             float ez = world_matrix.m[14] - camera->position.z;
@@ -1265,6 +1297,70 @@ void g3d_renderer_forward_pass(void) {
         g3d_renderer_render_mesh(drawmesh, material, world_matrix,
                                  mat4_identity());
     }
+}
+
+static void g3d_renderer_bind_scene_target(void) {
+#ifndef VITA
+    glBindFramebuffer(GL_FRAMEBUFFER, g_renderer.framebuffer);
+    if (g_renderer.framebuffer == g_renderer.target_fbo)
+        glViewport(g_renderer.vp_x, g_renderer.vp_y, g_renderer.vp_w, g_renderer.vp_h);
+    else
+        glViewport(0, 0, g_renderer.display_width, g_renderer.display_height);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+#endif
+}
+
+void g3d_renderer_forward_pass(void) {
+    if (!g_renderer.initialized || !g_renderer.active_camera)
+        return;
+
+    G3DCamera *camera = g_renderer.active_camera;
+    g3d_camera_update(camera);
+    if (g_renderer.frustum_culling_enabled)
+        g3d_camera_update_frustum(camera);
+
+    g3d_renderer_bind_scene_target();
+
+    int entity_count = 0;
+    int *entities = g3d_scene_impl_get_entities(&entity_count);
+    if (!entities || entity_count == 0)
+        return;
+
+    /* Opaque only. Transparent entities are drawn later (after the sky) so the
+       sky doesn't repaint them where there's no opaque geometry behind. */
+    draw_scene_entities(camera, entities, entity_count, 0);
+    g_draw_opacity = 1.0f;
+    g_draw_tint[0] = g_draw_tint[1] = g_draw_tint[2] = 1.0f;
+}
+
+void g3d_renderer_transparent_pass(void) {
+    if (!g_renderer.initialized || !g_renderer.active_camera)
+        return;
+    G3DCamera *camera = g_renderer.active_camera;
+
+    int entity_count = 0;
+    int *entities = g3d_scene_impl_get_entities(&entity_count);
+    if (!entities || entity_count == 0)
+        return;
+
+    g3d_renderer_bind_scene_target();
+#ifndef VITA
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE);   /* blended: test depth, don't write it */
+#endif
+
+    draw_scene_entities(camera, entities, entity_count, 1);
+
+#ifndef VITA
+    glBlendEquation(GL_FUNC_ADD);   /* reset (an entity may have used SUBTRACT) */
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
+#endif
+    g_draw_opacity = 1.0f;
+    g_draw_tint[0] = g_draw_tint[1] = g_draw_tint[2] = 1.0f;
 }
 
 void g3d_renderer_end_frame(void) {
@@ -1306,6 +1402,9 @@ void g3d_renderer_render(void) {
     g3d_renderer_ssao_pass();
     /* World-space volumetric low clouds (fly-through), composited over opaque + sky */
     g3d_renderer_cloud_pass();
+    /* Semi-transparent entities (alpha blended) AFTER opaque + sky so they aren't
+       repainted by the sky where there's no opaque geometry behind them. */
+    g3d_renderer_transparent_pass();
     /* Transparent water + flows after the opaque pass (same Y-flip for GRAPH).
        Grab the opaque scene first so the water can refract it. */
     g3d_water_tick();   /* re-emit ripples at registered sources (river mouths) */
@@ -1404,6 +1503,32 @@ void g3d_renderer_render_mesh(void *mesh, void *material, Mat4 model_matrix,
         if (albedo_tex && albedo_tex->gl_handle)
             albedo_gl = albedo_tex->gl_handle;
         g3d_shader_set_int(shader, "uTriplanar", g3d_material->triplanar);
+        g3d_shader_set_int(shader, "uBiome", g3d_material->biome);
+        g3d_shader_set_float(shader, "uBiomeAmp", g3d_material->biome_amp);
+        g3d_shader_set_float(shader, "uBiomeSea", g3d_material->biome_sea);
+        /* Optional per-biome textures on units 11..14 (sand/grass/rock/snow). Each
+           band is independent: bands without a texture keep the flat colour, and
+           their unit gets the default white texture so the sampler stays valid. */
+        const char *bn[4] = { "uBiomeSand", "uBiomeGrass", "uBiomeRock", "uBiomeSnow" };
+        float bmask[4] = { 0, 0, 0, 0 };
+        int any_biome_tex = 0;
+        if (g3d_material->biome) {
+            for (int b = 0; b < 4; b++) {
+                G3DTexture *bt = (G3DTexture *)g3d_material->biome_tex[b];
+                GLuint h = (bt && bt->gl_handle) ? bt->gl_handle : g_renderer.default_white_tex;
+                if (bt && bt->gl_handle) { bmask[b] = 1.0f; any_biome_tex = 1; }
+                glActiveTexture(GL_TEXTURE11 + b);
+                glBindTexture(GL_TEXTURE_2D, h);
+                g3d_shader_set_sampler2d(shader, bn[b], 11 + b);
+            }
+            glActiveTexture(GL_TEXTURE0);
+        }
+        g3d_shader_set_int(shader, "uHasBiomeTex", any_biome_tex);
+        if (any_biome_tex) {
+            g3d_shader_set_float(shader, "uBiomeTexScale", g3d_material->biome_tex_scale);
+            g3d_shader_set_vec4(shader, "uBiomeTexMask",
+                                vec4_make(bmask[0], bmask[1], bmask[2], bmask[3]));
+        }
         G3DTexture *wall_tex = (G3DTexture *)g3d_material->wall_texture;
         if (g3d_material->triplanar && wall_tex && wall_tex->gl_handle) {
             glActiveTexture(GL_TEXTURE3);
@@ -1431,6 +1556,8 @@ void g3d_renderer_render_mesh(void *mesh, void *material, Mat4 model_matrix,
         g3d_shader_set_float(shader, "uMetallic", 0.0f);
         g3d_shader_set_float(shader, "uRoughness", 0.5f);
         g3d_shader_set_int(shader, "uTriplanar", 0);
+        g3d_shader_set_int(shader, "uBiome", 0);
+        g3d_shader_set_int(shader, "uHasBiomeTex", 0);
         g3d_shader_set_int(shader, "uHasWallTex", 0);
         g3d_shader_set_int(shader, "uHasNormalMap", 0);
         g3d_shader_set_int(shader, "uHasMetalMap", 0);
@@ -1452,6 +1579,12 @@ void g3d_renderer_render_mesh(void *mesh, void *material, Mat4 model_matrix,
     /* Camera position for specular */
     Vec3 cam_pos = g_renderer.active_camera->position;
     g3d_shader_set_vec3(shader, "uCameraPosition", cam_pos);
+    /* GRAPH render (flip_y) inverts triangle winding -> tell the shader so its
+       gl_FrontFacing two-sided normal flip stays correct. */
+    g3d_shader_set_int(shader, "uFlipWinding", g_renderer.flip_y);
+    g3d_shader_set_float(shader, "uOpacity", g_draw_opacity);
+    g3d_shader_set_vec3(shader, "uEntityColor",
+                        vec3_make(g_draw_tint[0], g_draw_tint[1], g_draw_tint[2]));
 
     /* Get lights from active scene */
     int light_count = 0;
@@ -1614,6 +1747,13 @@ void g3d_renderer_set_fog(int enabled, Vec3 color, float start, float end) {
     g_renderer.fog_color[2] = color.z;
     g_renderer.fog_start = start;
     g_renderer.fog_end = end;
+}
+
+void g3d_renderer_get_fog(int *enabled, Vec3 *color, float *start, float *end) {
+    if (enabled) *enabled = g_renderer.fog_enabled;
+    if (color)   *color   = vec3_make(g_renderer.fog_color[0], g_renderer.fog_color[1], g_renderer.fog_color[2]);
+    if (start)   *start   = g_renderer.fog_start;
+    if (end)     *end     = g_renderer.fog_end;
 }
 
 void g3d_renderer_set_ambient_light(Vec3 color, float intensity) {

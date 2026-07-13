@@ -70,6 +70,10 @@ int64_t g3d_entity_set_scale_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_entity_get_position_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_entity_set_parent_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_entity_set_material_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_entity_set_alpha_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_entity_set_color_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_entity_set_blend_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_entity_use_locals_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_camera_create_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_camera_set_active_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_camera_set_position_bgd(INSTANCE *my, int64_t *params);
@@ -77,6 +81,7 @@ int64_t g3d_camera_look_at_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_camera_set_projection_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_camera_set_fov_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_load_gltf_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_gltf_set_recenter_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_load_gltf_fractured_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_load_obj_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_load_fbx_bgd(INSTANCE *my, int64_t *params);
@@ -188,6 +193,10 @@ int64_t g3d_stream_unload_count_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_stream_unload_x_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_stream_unload_z_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_stream_loaded_count_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_worldgen_set_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_worldgen_height_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_worldgen_tile_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_worldgen_tile_free_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_instances_set_distance_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_instances_clear_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_instances_count_bgd(INSTANCE *my, int64_t *params);
@@ -332,6 +341,7 @@ DLSYSFUNCS __bgdexport(libmod_3d, functions_exports)[] = {
     FUNC("G3D_CAMERA_SET_PROJECTION", "II", TYPE_INT, g3d_camera_set_projection_bgd),
     FUNC("G3D_CAMERA_SET_FOV", "IF", TYPE_INT, g3d_camera_set_fov_bgd),
     FUNC("G3D_LOAD_GLTF", "S", TYPE_INT, g3d_model_load_gltf_bgd),
+    FUNC("G3D_GLTF_SET_RECENTER", "I", TYPE_INT, g3d_gltf_set_recenter_bgd),
     FUNC("G3D_LOAD_GLTF_FRACTURED", "S", TYPE_INT, g3d_model_load_gltf_fractured_bgd),
     FUNC("G3D_LOAD_OBJ", "S", TYPE_INT, g3d_model_load_obj_bgd),
     FUNC("G3D_LOAD_FBX", "S", TYPE_INT, g3d_model_load_fbx_bgd),
@@ -483,6 +493,8 @@ DLSYSFUNCS __bgdexport(libmod_3d, functions_exports)[] = {
     FUNC("G3D_INSTANCES_SET_WIND", "IF", TYPE_INT, g3d_instances_set_wind_bgd),
     FUNC("G3D_INSTANCES_SET_ALPHA_CUT", "II", TYPE_INT, g3d_instances_set_alpha_cut_bgd),
     FUNC("G3D_SET_LOD", "F", TYPE_INT, g3d_set_lod_bgd),
+    FUNC("G3D_SET_CULLING", "I", TYPE_INT, g3d_set_culling_bgd),
+    FUNC("G3D_SET_BACKFACE_CULL", "I", TYPE_INT, g3d_set_backface_cull_bgd),
     FUNC("G3D_WORLD_REBASE", "FFF", TYPE_INT, g3d_world_rebase_bgd),
     FUNC("G3D_STREAM_INIT", "FI", TYPE_INT, g3d_stream_init_bgd),
     FUNC("G3D_STREAM_UPDATE", "FF", TYPE_INT, g3d_stream_update_bgd),
@@ -493,6 +505,12 @@ DLSYSFUNCS __bgdexport(libmod_3d, functions_exports)[] = {
     FUNC("G3D_STREAM_UNLOAD_X", "I", TYPE_INT, g3d_stream_unload_x_bgd),
     FUNC("G3D_STREAM_UNLOAD_Z", "I", TYPE_INT, g3d_stream_unload_z_bgd),
     FUNC("G3D_STREAM_LOADED_COUNT", "", TYPE_INT, g3d_stream_loaded_count_bgd),
+    FUNC("G3D_WORLDGEN_SET", "IFFF", TYPE_INT, g3d_worldgen_set_bgd),
+    FUNC("G3D_WORLDGEN_HEIGHT", "FF", TYPE_FLOAT, g3d_worldgen_height_bgd),
+    FUNC("G3D_WORLDGEN_TILE", "IIIFIFFI", TYPE_INT, g3d_worldgen_tile_bgd),
+    FUNC("G3D_WORLDGEN_TILE_FREE", "I", TYPE_INT, g3d_worldgen_tile_free_bgd),
+    FUNC("G3D_WORLDGEN_SET_WATER_DEPTH", "F", TYPE_INT, g3d_worldgen_set_water_depth_bgd),
+    FUNC("G3D_WORLDGEN_SET_BIOME_TEXTURES", "IIIIF", TYPE_INT, g3d_worldgen_set_biome_textures_bgd),
     FUNC("G3D_INSTANCES_SET_DISTANCE", "IF", TYPE_INT, g3d_instances_set_distance_bgd),
     FUNC("G3D_INSTANCES_CLEAR", "I", TYPE_INT, g3d_instances_clear_bgd),
     FUNC("G3D_INSTANCES_COUNT", "I", TYPE_INT, g3d_instances_count_bgd),
@@ -562,6 +580,10 @@ DLSYSFUNCS __bgdexport(libmod_3d, functions_exports)[] = {
     FUNC("G3D_PRIMITIVE_MOUNTAIN", "IFFFIF", TYPE_INT, g3d_primitive_mountain_bgd),
     FUNC("G3D_ENTITY_SET_MESH", "II", TYPE_INT, g3d_entity_set_mesh_bgd),
     FUNC("G3D_ENTITY_SET_MATERIAL", "II", TYPE_INT, g3d_entity_set_material_bgd),
+    FUNC("G3D_ENTITY_SET_ALPHA", "II", TYPE_INT, g3d_entity_set_alpha_bgd),
+    FUNC("G3D_ENTITY_SET_COLOR", "IIII", TYPE_INT, g3d_entity_set_color_bgd),
+    FUNC("G3D_ENTITY_SET_BLEND", "II", TYPE_INT, g3d_entity_set_blend_bgd),
+    FUNC("G3D_ENTITY_USE_LOCALS", "I", TYPE_INT, g3d_entity_use_locals_bgd),
     FUNC("G3D_MATERIAL_SET_TEXTURE", "III", TYPE_INT, g3d_material_set_texture_bgd),
     FUNC("G3D_MATERIAL_SET_MAP", "III", TYPE_INT, g3d_material_set_map_bgd),
     FUNC("G3D_MODEL_SUBMESH_MAP", "III", TYPE_INT, g3d_model_submesh_map_bgd),

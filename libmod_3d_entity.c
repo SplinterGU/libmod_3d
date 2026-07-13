@@ -37,6 +37,9 @@ int g3d_entity_impl_spawn(int scene_id, int model_id, float x, float y, float z)
     entity->parent_id = -1;
     entity->active = 1;
     entity->world_matrix_dirty = 1;
+    entity->opacity = 1.0f;   /* opaque by default */
+    entity->tint[0] = entity->tint[1] = entity->tint[2] = 1.0f;   /* no tint */
+    entity->blend_mode = 1;   /* BLEND_NORMAL (standard alpha) */
 
     /* Default transform */
     entity->position = vec3_make(x, y, z);
@@ -176,6 +179,45 @@ int g3d_entity_impl_set_material(int entity_id, int material_id) {
         return 0;
 
     entity->material_id = material_id;
+    return 1;
+}
+
+int g3d_entity_impl_set_alpha(int entity_id, float opacity) {
+    G3DEntity *entity = g3d_entity_impl_get(entity_id);
+    if (!entity)
+        return 0;
+    if (opacity < 0.0f) opacity = 0.0f; else if (opacity > 1.0f) opacity = 1.0f;
+    entity->opacity = opacity;
+    /* Apply to the whole tree so it works on a g3d_model_spawn root (empty root
+       + submesh children). Parenting here is shallow (root -> children). */
+    for (int i = 0; i < g_entity_count; i++)
+        if (g_entities[i].active && g_entities[i].parent_id == entity_id)
+            g3d_entity_impl_set_alpha(i, opacity);
+    return 1;
+}
+
+int g3d_entity_impl_set_color(int entity_id, float r, float g, float b) {
+    G3DEntity *entity = g3d_entity_impl_get(entity_id);
+    if (!entity)
+        return 0;
+    if (r < 0.0f) r = 0.0f; else if (r > 1.0f) r = 1.0f;
+    if (g < 0.0f) g = 0.0f; else if (g > 1.0f) g = 1.0f;
+    if (b < 0.0f) b = 0.0f; else if (b > 1.0f) b = 1.0f;
+    entity->tint[0] = r; entity->tint[1] = g; entity->tint[2] = b;
+    for (int i = 0; i < g_entity_count; i++)
+        if (g_entities[i].active && g_entities[i].parent_id == entity_id)
+            g3d_entity_impl_set_color(i, r, g, b);
+    return 1;
+}
+
+int g3d_entity_impl_set_blend(int entity_id, int mode) {
+    G3DEntity *entity = g3d_entity_impl_get(entity_id);
+    if (!entity)
+        return 0;
+    entity->blend_mode = mode;
+    for (int i = 0; i < g_entity_count; i++)
+        if (g_entities[i].active && g_entities[i].parent_id == entity_id)
+            g3d_entity_impl_set_blend(i, mode);
     return 1;
 }
 

@@ -25,6 +25,7 @@
 #include "libmod_3d_mirror.h"
 #include "libmod_3d_instance.h"
 #include "libmod_3d_stream.h"
+#include "libmod_3d_worldgen.h"
 #include "libmod_3d_prefab.h"
 #include "libmod_3d_scenefile.h"
 #include "libmod_3d_voxterrain.h"
@@ -35,6 +36,21 @@
 #include <SDL.h>
 #include "SDL_gpu.h"
 #include "xstrings.h"
+
+/* libbggfx already EXPORTS its process-local table (alpha, color_r/g/b, ...).
+   We only READ it from here (no BennuGD2 source is modified) so 3D entities can
+   obey the same `alpha`/`color_*` locals the 2D painter uses. Looked up by NAME
+   to stay robust to enum order. */
+extern DLVARFIXUP libbggfx_locals_fixup[];
+
+static uint8_t *bggfx_local_byte(INSTANCE *my, const char *name) {
+    if (!my || !my->locdata) return NULL;
+    for (int i = 0; libbggfx_locals_fixup[i].var; i++)
+        if (strcmp(libbggfx_locals_fixup[i].var, name) == 0)
+            return (uint8_t *)(intptr_t)my->locdata
+                 + (uint64_t)(intptr_t)libbggfx_locals_fixup[i].data_offset;
+    return NULL;
+}
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -259,6 +275,48 @@ int64_t g3d_entity_set_material_bgd(INSTANCE *my, int64_t *params) {
     int material_id = (int)params[1];
     return g3d_entity_impl_set_material(entity_id, material_id);
 }
+
+/* Opacity from BennuGD's 0..255 `alpha` convention (255 = opaque). Applies to
+   the whole model tree. Pass your process' `alpha` local straight in. */
+int64_t g3d_entity_set_alpha_bgd(INSTANCE *my, int64_t *params) {
+    int entity_id = (int)params[0];
+    float a = (float)params[1] / 255.0f;
+    return g3d_entity_impl_set_alpha(entity_id, a);
+}
+
+/* RGB tint from BennuGD's 0..255 color convention (255,255,255 = no tint). */
+int64_t g3d_entity_set_color_bgd(INSTANCE *my, int64_t *params) {
+    int entity_id = (int)params[0];
+    return g3d_entity_impl_set_color(entity_id, (float)params[1] / 255.0f,
+                                     (float)params[2] / 255.0f,
+                                     (float)params[3] / 255.0f);
+}
+
+/* Blend mode, using BennuGD's blend_mode constants (BLEND_NORMAL, BLEND_ADD,
+   BLEND_MULTIPLY, BLEND_SUBTRACT). Applies to the whole model tree. */
+int64_t g3d_entity_set_blend_bgd(INSTANCE *my, int64_t *params) {
+    return g3d_entity_impl_set_blend((int)params[0], (int)params[1]);
+}
+
+/* Make the entity obey the CALLING process' own reserved locals - the SAME
+   `alpha` / `color_r,g,b` / `blend_mode` the 2D painter reads. Call it each frame
+   from the process that owns the entity and the 3D model follows its
+   alpha/colour/blend with zero extra bookkeeping:  g3d_entity_use_locals(myent); */
+int64_t g3d_entity_use_locals_bgd(INSTANCE *my, int64_t *params) {
+    int entity_id = (int)params[0];
+    uint8_t *a = bggfx_local_byte(my, "alpha");
+    uint8_t *r = bggfx_local_byte(my, "color_r");
+    uint8_t *g = bggfx_local_byte(my, "color_g");
+    uint8_t *b = bggfx_local_byte(my, "color_b");
+    int64_t *bm = (int64_t *)bggfx_local_byte(my, "blendmode");
+    if (a) g3d_entity_impl_set_alpha(entity_id, (float)(*a) / 255.0f);
+    if (r && g && b)
+        g3d_entity_impl_set_color(entity_id, (float)(*r) / 255.0f,
+                                  (float)(*g) / 255.0f, (float)(*b) / 255.0f);
+    if (bm) g3d_entity_impl_set_blend(entity_id, (int)(*bm));
+    return 1;
+}
+
 
 int64_t g3d_entity_set_parent_bgd(INSTANCE *my, int64_t *params) {
     int entity_id = (int)params[0];
@@ -540,6 +598,11 @@ int64_t g3d_model_load_gltf_bgd(INSTANCE *my, int64_t *params) {
     return (int64_t)(intptr_t)model;
 }
 
+int64_t g3d_gltf_set_recenter_bgd(INSTANCE *my, int64_t *params) {
+    g3d_gltf_set_recenter((int)params[0]);
+    return 1;
+}
+
 int64_t g3d_model_load_gltf_fractured_bgd(INSTANCE *my, int64_t *params) {
     g3d_ensure_init();
     const char *filename = (const char *)string_get(params[0]);
@@ -803,6 +866,11 @@ static G3DMesh *build_model_merged_lod(G3DModel *model, float s) {
     uint32_t tv = 0, ti = 0;
     for (uint32_t i = 0; i < model->mesh_count; i++) { tv += model->meshes[i].vertex_count; ti += model->meshes[i].index_count; }
     if (tv < 48 || ti < 3) return NULL;
+    /* Skip environment-scale models (whole maps): merging them would (a) alloc a
+       giant temporary buffer and (b) collapse the ENTIRE map to one blob whenever
+       the camera is far from the model origin -- which is always, inside a map.
+       Such models keep per-submesh culling + per-mesh LOD instead. */
+    if (tv > 1000000u || model->mesh_count > 512) return NULL;
     G3DVertex *verts = (G3DVertex *)malloc((size_t)tv * sizeof(G3DVertex));
     uint32_t *idx = (uint32_t *)malloc((size_t)ti * sizeof(uint32_t));
     if (!verts || !idx) { free(verts); free(idx); return NULL; }
@@ -854,6 +922,11 @@ int g3d_model_spawn(int scene_id, void *model_ptr, float x, float y, float z,
             void *alb = model->mesh_textures ? model->mesh_textures[j] : NULL;
             m->albedo_texture = alb;
             m->albedo_texture_id = alb ? 0 : -1;
+            /* Static map/prop geometry is matte: a glossy default (0.5) puts a
+               grazing specular sheen on flat ground toward the horizon that reads
+               as a bright "seam". High roughness keeps it flat and even. */
+            m->roughness = 0.9f;
+            m->metallic  = 0.0f;
             if (model->mesh_normal && model->mesh_normal[j])       g3d_material_impl_set_map(mat, 1, model->mesh_normal[j]);
             if (model->mesh_metallic && model->mesh_metallic[j])   g3d_material_impl_set_map(mat, 2, model->mesh_metallic[j]);
             if (model->mesh_roughness && model->mesh_roughness[j]) g3d_material_impl_set_map(mat, 3, model->mesh_roughness[j]);
@@ -1242,6 +1315,14 @@ int64_t g3d_set_lod_bgd(INSTANCE *my, int64_t *params) {
     g3d_instances_set_lod_distance(*(float *)&params[0]);
     return 1;
 }
+int64_t g3d_set_culling_bgd(INSTANCE *my, int64_t *params) {
+    g3d_renderer_set_frustum_culling((int)params[0]);
+    return 1;
+}
+int64_t g3d_set_backface_cull_bgd(INSTANCE *my, int64_t *params) {
+    g3d_renderer_set_backface_cull((int)params[0]);
+    return 1;
+}
 /* Floating origin: shift the whole world by (-dx,-dy,-dz) so coordinates stay
    small far from the origin (float precision). The game calls this when the
    camera drifts past a threshold, then offsets its own camera + bookkeeping. */
@@ -1264,6 +1345,34 @@ int64_t g3d_stream_unload_count_bgd(INSTANCE *my, int64_t *params) { return (int
 int64_t g3d_stream_unload_x_bgd(INSTANCE *my, int64_t *params)     { return (int64_t)g3d_stream_unload_x((int)params[0]); }
 int64_t g3d_stream_unload_z_bgd(INSTANCE *my, int64_t *params)     { return (int64_t)g3d_stream_unload_z((int)params[0]); }
 int64_t g3d_stream_loaded_count_bgd(INSTANCE *my, int64_t *params) { return (int64_t)g3d_stream_loaded_count(); }
+
+/* ---- procedural world generation ---- */
+int64_t g3d_worldgen_set_bgd(INSTANCE *my, int64_t *params) {
+    g3d_worldgen_set((int)params[0], *(float *)&params[1], *(float *)&params[2], *(float *)&params[3]);
+    return 1;
+}
+int64_t g3d_worldgen_height_bgd(INSTANCE *my, int64_t *params) {
+    float v = g3d_worldgen_height(*(float *)&params[0], *(float *)&params[1]);
+    return (int64_t) * (int32_t *)&v;
+}
+int64_t g3d_worldgen_tile_bgd(INSTANCE *my, int64_t *params) {
+    return (int64_t)g3d_worldgen_tile((int)params[0], (int)params[1], (int)params[2],
+                                      *(float *)&params[3], (int)params[4],
+                                      *(float *)&params[5], *(float *)&params[6],
+                                      (void *)(intptr_t)params[7]);
+}
+int64_t g3d_worldgen_tile_free_bgd(INSTANCE *my, int64_t *params) {
+    g3d_worldgen_tile_free((int)params[0]); return 1;
+}
+int64_t g3d_worldgen_set_water_depth_bgd(INSTANCE *my, int64_t *params) {
+    g3d_worldgen_set_water_depth(*(float *)&params[0]); return 1;
+}
+int64_t g3d_worldgen_set_biome_textures_bgd(INSTANCE *my, int64_t *params) {
+    g3d_worldgen_set_biome_textures((void *)(intptr_t)params[0], (void *)(intptr_t)params[1],
+                                    (void *)(intptr_t)params[2], (void *)(intptr_t)params[3],
+                                    *(float *)&params[4]);
+    return 1;
+}
 
 int64_t g3d_instances_set_distance_bgd(INSTANCE *my, int64_t *params) {
     g3d_instances_set_distance((int)params[0], *(float *)&params[1]);

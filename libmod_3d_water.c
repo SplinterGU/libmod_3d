@@ -149,6 +149,10 @@ static const char *water_frag =
     "uniform vec3 uLightColor;\n"
     "uniform vec3 uWaterDeep;\n"
     "uniform vec3 uWaterShallow;\n"
+    "uniform int uFogEnabled;\n"     /* scene fog: fade distant water to the same fog as the world */
+    "uniform vec3 uFogColor;\n"
+    "uniform float uFogStart;\n"
+    "uniform float uFogEnd;\n"
     "uniform sampler2D uWaterTex;\n"
     "uniform int uHasTex;\n"
     "uniform float uTime;\n"
@@ -354,6 +358,14 @@ static const char *water_frag =
     "    vec3 hazeCol = vec3(0.74, 0.83, 0.93);\n"   // light atmospheric horizon
     "    col = mix(col, hazeCol, haze * 0.9);\n"
     "    alpha = max(alpha, haze * 0.9);\n"     // distant water stays opaque against the sky
+    // Scene fog: fade distant water to the SAME fog as the rest of the world so the
+    // huge plane's far edge dissolves into the horizon instead of ending in a hard
+    // line. Fully-fogged water is forced opaque -> seamless with the fogged sky/land.
+    "    if (uFogEnabled == 1) {\n"
+    "        float ff = clamp((uFogEnd - dist) / max(uFogEnd - uFogStart, 0.001), 0.0, 1.0);\n"
+    "        col = mix(uFogColor, col, ff);\n"
+    "        alpha = max(alpha, 1.0 - ff);\n"
+    "    }\n"
     "    FragColor = vec4(col, clamp(alpha, 0.0, 1.0));\n"
     "}\n";
 
@@ -649,6 +661,15 @@ void g3d_water_render_pass(G3DCamera *camera, int flip_y) {
         }
     }
     g3d_shader_set_vec3(g_water.shader, "uCameraPos", camera->position);
+    /* Same scene fog as the world so distant water dissolves into the horizon. */
+    {
+        int fen = 0; Vec3 fcol = vec3_make(0.7f, 0.78f, 0.88f); float fst = 0.0f, fen2 = 1.0f;
+        g3d_renderer_get_fog(&fen, &fcol, &fst, &fen2);
+        g3d_shader_set_int(g_water.shader, "uFogEnabled", fen);
+        g3d_shader_set_vec3(g_water.shader, "uFogColor", fcol);
+        g3d_shader_set_float(g_water.shader, "uFogStart", fst);
+        g3d_shader_set_float(g_water.shader, "uFogEnd", fen2);
+    }
     g3d_shader_set_vec3(g_water.shader, "uWaterDeep",
                         vec3_make(g_water.deep[0], g_water.deep[1], g_water.deep[2]));
     g3d_shader_set_vec3(g_water.shader, "uWaterShallow",
@@ -856,6 +877,14 @@ void g3d_fluid_render_pass(G3DCamera *camera, int flip_y) {
     g3d_shader_set_float(g_water.shader, "uWaveLen", g_fluid.len);
     g3d_shader_set_float(g_water.shader, "uWaveSpeed", g_fluid.speed);
     g3d_shader_set_vec3(g_water.shader, "uCameraPos", camera->position);
+    {   /* same scene fog as the world so distant water dissolves into the horizon */
+        int fen = 0; Vec3 fcol = vec3_make(0.7f, 0.78f, 0.88f); float fst = 0.0f, fnd = 1.0f;
+        g3d_renderer_get_fog(&fen, &fcol, &fst, &fnd);
+        g3d_shader_set_int(g_water.shader, "uFogEnabled", fen);
+        g3d_shader_set_vec3(g_water.shader, "uFogColor", fcol);
+        g3d_shader_set_float(g_water.shader, "uFogStart", fst);
+        g3d_shader_set_float(g_water.shader, "uFogEnd", fnd);
+    }
     g3d_shader_set_vec3(g_water.shader, "uWaterDeep",
                         vec3_make(g_fluid.deep[0], g_fluid.deep[1], g_fluid.deep[2]));
     g3d_shader_set_vec3(g_water.shader, "uWaterShallow",
@@ -1017,6 +1046,14 @@ void g3d_water_draw_mesh(G3DMesh *mesh, G3DCamera *camera, int flip_y) {
     g3d_shader_set_float(sh, "uWaveLen", 8.0f);
     g3d_shader_set_float(sh, "uWaveSpeed", 1.0f);
     g3d_shader_set_vec3(sh, "uCameraPos", camera->position);
+    {   /* same scene fog as the world so distant water dissolves into the horizon */
+        int fen = 0; Vec3 fcol = vec3_make(0.7f, 0.78f, 0.88f); float fst = 0.0f, fnd = 1.0f;
+        g3d_renderer_get_fog(&fen, &fcol, &fst, &fnd);
+        g3d_shader_set_int(sh, "uFogEnabled", fen);
+        g3d_shader_set_vec3(sh, "uFogColor", fcol);
+        g3d_shader_set_float(sh, "uFogStart", fst);
+        g3d_shader_set_float(sh, "uFogEnd", fnd);
+    }
     g3d_shader_set_float(sh, "uTessMax", 12.0f);   /* max subdivision near camera */
     g3d_shader_set_vec3(sh, "uWaterDeep",
                         g_fluid.style_set ? vec3_make(g_fluid.deep[0], g_fluid.deep[1], g_fluid.deep[2])

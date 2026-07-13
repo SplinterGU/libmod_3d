@@ -46,6 +46,23 @@ typedef struct {
     void *lod_mesh;
     int lod_material;
     int lod_far;
+
+    /* Opt out of the automatic per-mesh LOD decimation. Terrain tiles set this:
+       their borders must stay full-res so neighbouring tiles keep matching
+       (decimating them opens cracks along the tile grid at distance). */
+    int lod_exempt;
+
+    /* Opacity 0..1 (1 = opaque). < 1 -> drawn in the transparent pass (alpha
+       blended). Set from BennuGD's 0..255 `alpha` local via g3d_entity_set_alpha. */
+    float opacity;
+
+    /* RGB tint 0..1 multiplied into the albedo (1,1,1 = no tint). Like BennuGD's
+       per-graphic colour. Set via g3d_entity_set_color (0..255). */
+    float tint[3];
+
+    /* Blend mode, using BennuGD's blend_mode values (g_blit.h): 1 NORMAL alpha,
+       3 MULTIPLY, 4 ADD, 5 SUBTRACT. Non-normal modes force the transparent pass. */
+    int blend_mode;
 } G3DEntity;
 
 /* Entity lifecycle */
@@ -64,6 +81,16 @@ int g3d_entity_impl_set_parent(int entity_id, int parent_id);
 
 /* Material */
 int g3d_entity_impl_set_material(int entity_id, int material_id);
+
+/* Opacity 0..1 (applied to the entity and all its children, so it works on a
+   whole g3d_model_spawn tree). 1 = opaque, < 1 = alpha blended. */
+int g3d_entity_impl_set_alpha(int entity_id, float opacity);
+
+/* RGB tint 0..1 multiplied into the albedo (applied to the whole tree). */
+int g3d_entity_impl_set_color(int entity_id, float r, float g, float b);
+
+/* Blend mode (BennuGD blend_mode values), applied to the whole tree. */
+int g3d_entity_impl_set_blend(int entity_id, int mode);
 
 /* Matrix */
 Mat4 g3d_entity_impl_get_world_matrix(int entity_id);

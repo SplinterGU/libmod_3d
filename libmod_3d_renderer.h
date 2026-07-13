@@ -178,6 +178,8 @@ void g3d_renderer_resolve_hdr(void);                    /* resolve HDR+bloom (+A
 /* Enable/disable features */
 void g3d_renderer_set_wireframe_mode(int enabled);
 void g3d_renderer_set_frustum_culling(int enabled);
+void g3d_renderer_set_backface_cull(int enabled);
+void g3d_renderer_transparent_pass(void);
 
 /* Begin frame (clear buffers, reset stats) */
 void g3d_renderer_begin_frame(void);
@@ -230,6 +232,7 @@ void g3d_renderer_render_mesh(void *mesh,           /* G3DMesh* */
 
 /* Linear fog: blends scene toward color between start and end distance */
 void g3d_renderer_set_fog(int enabled, Vec3 color, float start, float end);
+void g3d_renderer_get_fog(int *enabled, Vec3 *color, float *start, float *end);
 
 /* Set lighting uniforms */
 void g3d_renderer_set_ambient_light(Vec3 color, float intensity);

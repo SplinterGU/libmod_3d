@@ -109,6 +109,26 @@ int g3d_material_impl_set_triplanar(int material_id, int on) {
     return 1;
 }
 
+int g3d_material_impl_set_biome(int material_id, int on, float amplitude, float sea_level) {
+    G3DMaterial *mat = g3d_material_impl_get(material_id);
+    if (!mat) return 0;
+    mat->biome = on ? 1 : 0;
+    mat->biome_amp = (amplitude > 0.0f) ? amplitude : 60.0f;
+    mat->biome_sea = sea_level;
+    return 1;
+}
+
+int g3d_material_impl_set_biome_textures(int material_id, void *sand, void *grass, void *rock, void *snow, float scale) {
+    G3DMaterial *mat = g3d_material_impl_get(material_id);
+    if (!mat) return 0;
+    mat->biome_tex[0] = sand;
+    mat->biome_tex[1] = grass;
+    mat->biome_tex[2] = rock;
+    mat->biome_tex[3] = snow;
+    mat->biome_tex_scale = (scale > 0.0f) ? scale : 0.03f;
+    return 1;
+}
+
 int g3d_material_impl_set_map(int material_id, int type, void *texture) {
     G3DMaterial *mat = g3d_material_impl_get(material_id);
     if (!mat) return 0;
