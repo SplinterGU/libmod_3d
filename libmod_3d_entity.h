@@ -60,10 +60,31 @@ typedef struct {
        per-graphic colour. Set via g3d_entity_set_color (0..255). */
     float tint[3];
 
-    /* Blend mode, using BennuGD's blend_mode values (g_blit.h): 1 NORMAL alpha,
-       3 MULTIPLY, 4 ADD, 5 SUBTRACT. Non-normal modes force the transparent pass. */
+    /* Blend mode (G3D_BLEND_* below, values match BennuGD's blendmode local).
+       Non-normal modes force the transparent pass. */
     int blend_mode;
+    /* Factors for G3D_BLEND_CUSTOM (raw GL enums, like BennuGD's custom_blendmode):
+       [0]src_rgb [1]dst_rgb [2]src_alpha [3]dst_alpha [4]eq_rgb [5]eq_alpha */
+    int blend_custom[6];
 } G3DEntity;
+
+/* Blend modes - values MATCH BennuGD's g_blit.h so the process `blendmode` local
+   maps 1:1 (0/NONE, 1/NORMAL, ... up to CUSTOM which reads custom_blendmode). */
+#define G3D_BLEND_CUSTOM              (-2)
+#define G3D_BLEND_DISABLED           (-1)
+#define G3D_BLEND_NONE                 0
+#define G3D_BLEND_NORMAL               1
+#define G3D_BLEND_PREMULTIPLIED_ALPHA  2
+#define G3D_BLEND_MULTIPLY             3
+#define G3D_BLEND_ADD                  4
+#define G3D_BLEND_SUBTRACT             5
+#define G3D_BLEND_MOD_ALPHA            6
+#define G3D_BLEND_SET_ALPHA            7
+#define G3D_BLEND_SET                  8
+#define G3D_BLEND_NORMAL_KEEP_ALPHA    9
+#define G3D_BLEND_NORMAL_ADD_ALPHA    10
+#define G3D_BLEND_NORMAL_FACTOR_ALPHA 11
+#define G3D_BLEND_ALPHA_MASK          12
 
 /* Entity lifecycle */
 int g3d_entity_impl_spawn(int scene_id, int model_id, float x, float y, float z);
@@ -89,8 +110,13 @@ int g3d_entity_impl_set_alpha(int entity_id, float opacity);
 /* RGB tint 0..1 multiplied into the albedo (applied to the whole tree). */
 int g3d_entity_impl_set_color(int entity_id, float r, float g, float b);
 
-/* Blend mode (BennuGD blend_mode values), applied to the whole tree. */
+/* Blend mode (G3D_BLEND_* values), applied to the whole tree. */
 int g3d_entity_impl_set_blend(int entity_id, int mode);
+/* Custom blend factors (raw GL enums) for G3D_BLEND_CUSTOM, applied to the tree. */
+int g3d_entity_impl_set_blend_custom(int entity_id, int src_rgb, int dst_rgb,
+                                     int src_alpha, int dst_alpha,
+                                     int eq_rgb, int eq_alpha);
+
 
 /* Matrix */
 Mat4 g3d_entity_impl_get_world_matrix(int entity_id);

@@ -39,7 +39,11 @@ int g3d_entity_impl_spawn(int scene_id, int model_id, float x, float y, float z)
     entity->world_matrix_dirty = 1;
     entity->opacity = 1.0f;   /* opaque by default */
     entity->tint[0] = entity->tint[1] = entity->tint[2] = 1.0f;   /* no tint */
-    entity->blend_mode = 1;   /* BLEND_NORMAL (standard alpha) */
+    entity->blend_mode = G3D_BLEND_NORMAL;
+    /* default custom factors = standard alpha (GL enums) */
+    entity->blend_custom[0] = 0x0302; entity->blend_custom[1] = 0x0303;  /* SRC_ALPHA, ONE_MINUS_SRC_ALPHA */
+    entity->blend_custom[2] = 0x0302; entity->blend_custom[3] = 0x0303;
+    entity->blend_custom[4] = 0x8006; entity->blend_custom[5] = 0x8006;  /* FUNC_ADD */
 
     /* Default transform */
     entity->position = vec3_make(x, y, z);
@@ -218,6 +222,21 @@ int g3d_entity_impl_set_blend(int entity_id, int mode) {
     for (int i = 0; i < g_entity_count; i++)
         if (g_entities[i].active && g_entities[i].parent_id == entity_id)
             g3d_entity_impl_set_blend(i, mode);
+    return 1;
+}
+
+int g3d_entity_impl_set_blend_custom(int entity_id, int src_rgb, int dst_rgb,
+                                     int src_alpha, int dst_alpha,
+                                     int eq_rgb, int eq_alpha) {
+    G3DEntity *entity = g3d_entity_impl_get(entity_id);
+    if (!entity)
+        return 0;
+    entity->blend_custom[0] = src_rgb;   entity->blend_custom[1] = dst_rgb;
+    entity->blend_custom[2] = src_alpha; entity->blend_custom[3] = dst_alpha;
+    entity->blend_custom[4] = eq_rgb;    entity->blend_custom[5] = eq_alpha;
+    for (int i = 0; i < g_entity_count; i++)
+        if (g_entities[i].active && g_entities[i].parent_id == entity_id)
+            g3d_entity_impl_set_blend_custom(i, src_rgb, dst_rgb, src_alpha, dst_alpha, eq_rgb, eq_alpha);
     return 1;
 }
 
