@@ -16,10 +16,109 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <math.h>
 
 #include <SDL.h>
 #include <SDL_image.h>
+
+#ifndef VITA
+#include <GL/gl.h>
+#include <GL/glext.h>
+#endif
+
+/* GL block-compressed formats (DDS). Defined here in case glext.h is old. */
+#ifndef GL_COMPRESSED_RGB_S3TC_DXT1_EXT
+#define GL_COMPRESSED_RGB_S3TC_DXT1_EXT 0x83F0
+#endif
+#ifndef GL_COMPRESSED_RGBA_S3TC_DXT1_EXT
+#define GL_COMPRESSED_RGBA_S3TC_DXT1_EXT 0x83F1
+#endif
+#ifndef GL_COMPRESSED_RGBA_S3TC_DXT3_EXT
+#define GL_COMPRESSED_RGBA_S3TC_DXT3_EXT 0x83F2
+#endif
+#ifndef GL_COMPRESSED_RGBA_S3TC_DXT5_EXT
+#define GL_COMPRESSED_RGBA_S3TC_DXT5_EXT 0x83F3
+#endif
+#ifndef GL_COMPRESSED_RG_RGTC2
+#define GL_COMPRESSED_RG_RGTC2 0x8DBD
+#endif
+#ifndef GL_COMPRESSED_RGBA_BPTC_UNORM
+#define GL_COMPRESSED_RGBA_BPTC_UNORM 0x8E8C   /* BC7 */
+#endif
+#ifndef GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM
+#define GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM 0x8E8D
+#endif
+
+/* Load a DDS image (DXT1/DXT3/DXT5/ATI2 block compression) straight to a GL
+   texture with glCompressedTexImage2D - the GPU reads these natively, so no CPU
+   decode. Returns a G3DTexture with its gl_handle set (data stays NULL). */
+static G3DTexture *load_dds_from_memory(const uint8_t *d, size_t size) {
+#ifdef VITA
+    (void)d; (void)size; return NULL;
+#else
+    if (size < 128 || memcmp(d, "DDS ", 4) != 0) return NULL;
+    #define RDU32(o) ((uint32_t)d[o] | ((uint32_t)d[(o)+1]<<8) | ((uint32_t)d[(o)+2]<<16) | ((uint32_t)d[(o)+3]<<24))
+    uint32_t height = RDU32(12);
+    uint32_t width  = RDU32(16);
+    uint32_t mips   = RDU32(28);
+    #undef RDU32
+    if (mips == 0) mips = 1;
+    const uint8_t *fc = d + 84;   /* pixel-format FourCC */
+
+    GLenum glfmt; int block; size_t data_off = 128;
+    if      (!memcmp(fc, "DXT1", 4)) { glfmt = GL_COMPRESSED_RGB_S3TC_DXT1_EXT;  block = 8;  }
+    else if (!memcmp(fc, "DXT3", 4)) { glfmt = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT; block = 16; }
+    else if (!memcmp(fc, "DXT5", 4)) { glfmt = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT; block = 16; }
+    else if (!memcmp(fc, "ATI2", 4)) { glfmt = GL_COMPRESSED_RG_RGTC2;           block = 16; }
+    else if (!memcmp(fc, "DX10", 4)) {
+        /* DDS_HEADER_DXT10 follows (20 bytes) -> pixel data starts at 148. */
+        if (size < 148) return NULL;
+        uint32_t dxgi = (uint32_t)d[128] | ((uint32_t)d[129]<<8) | ((uint32_t)d[130]<<16) | ((uint32_t)d[131]<<24);
+        data_off = 148;
+        switch (dxgi) {
+            case 98: case 99: glfmt = GL_COMPRESSED_RGBA_BPTC_UNORM;   block = 16; break; /* BC7 (/sRGB) */
+            case 71: case 72: glfmt = GL_COMPRESSED_RGB_S3TC_DXT1_EXT; block = 8;  break; /* BC1 */
+            case 74: case 75: glfmt = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;block = 16; break; /* BC2 */
+            case 77: case 78: glfmt = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;block = 16; break; /* BC3 */
+            case 83:          glfmt = GL_COMPRESSED_RG_RGTC2;          block = 16; break; /* BC5 */
+            default: return NULL;
+        }
+    }
+    else return NULL;   /* unsupported DDS variant */
+
+    GLuint handle = 0;
+    glGenTextures(1, &handle);
+    glBindTexture(GL_TEXTURE_2D, handle);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                    (mips > 1) ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
+
+    const uint8_t *p = d + data_off;
+    size_t left = size - data_off;
+    uint32_t w = width, h = height, level, done = 0;
+    for (level = 0; level < mips; level++) {
+        if (w == 0) w = 1;
+        if (h == 0) h = 1;
+        size_t lvl = (size_t)((w + 3) / 4) * ((h + 3) / 4) * block;
+        if (lvl > left) break;
+        glCompressedTexImage2D(GL_TEXTURE_2D, level, glfmt, w, h, 0, (GLsizei)lvl, p);
+        p += lvl; left -= lvl; done++;
+        w /= 2; h /= 2;
+    }
+    if (done == 0) { glDeleteTextures(1, &handle); return NULL; }
+    if (done == 1 && mips > 1) glGenerateMipmap(GL_TEXTURE_2D);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, (GLint)done - 1);
+
+    G3DTexture *tex = (G3DTexture *)calloc(1, sizeof(G3DTexture));
+    if (!tex) { glDeleteTextures(1, &handle); return NULL; }
+    tex->width = width; tex->height = height; tex->channels = 4;
+    tex->gl_handle = handle; tex->gpu_uploaded = 1;
+    return tex;
+#endif
+}
 
 /* Build a G3DTexture (RGBA, uploaded) from an SDL_Surface. */
 static G3DTexture *texture_from_surface(SDL_Surface *src) {
@@ -48,30 +147,6 @@ static G3DTexture *texture_from_surface(SDL_Surface *src) {
     return tex;
 }
 
-/* Load the base-colour texture of a glTF material (embedded or external). */
-/* Decode a cgltf image (embedded buffer_view or external file) to an SDL surface. */
-static SDL_Surface *decode_image(cgltf_image *img, const char *gltf_path) {
-    if (!img)
-        return NULL;
-    if (img->buffer_view) {
-        cgltf_buffer_view *bv = img->buffer_view;
-        const uint8_t *bytes = (const uint8_t *)bv->buffer->data + bv->offset;
-        SDL_RWops *rw = SDL_RWFromConstMem(bytes, (int)bv->size);
-        if (rw)
-            return IMG_Load_RW(rw, 1);
-    } else if (img->uri && strncmp(img->uri, "data:", 5) != 0) {
-        char dir[512];
-        strncpy(dir, gltf_path ? gltf_path : "", sizeof(dir) - 1);
-        dir[sizeof(dir) - 1] = '\0';
-        char *slash = strrchr(dir, '/');
-        if (slash) slash[1] = '\0'; else dir[0] = '\0';
-        char path[800];
-        snprintf(path, sizeof(path), "%s%s", dir, img->uri);
-        return IMG_Load(path);
-    }
-    return NULL;
-}
-
 /* Pick the albedo texture from a material, trying the common slots so models
    that don't use the standard PBR base-colour slot still get textured. */
 static cgltf_texture *pick_albedo_texture(cgltf_material *mat) {
@@ -88,18 +163,88 @@ static cgltf_texture *pick_albedo_texture(cgltf_material *mat) {
     return NULL;
 }
 
+/* Load one texture FILE: DDS (block-compressed, GPU-native) or anything
+   SDL2_image can decode (PNG/JPG/...). Returns NULL if the file is missing or
+   its format is unsupported. */
+static G3DTexture *load_file_texture(const char *path) {
+    size_t fsz = 0;
+    void *fdata = SDL_LoadFile(path, &fsz);
+    if (fdata) {
+        G3DTexture *tex = NULL;
+        if (fsz >= 4 && memcmp(fdata, "DDS ", 4) == 0)
+            tex = load_dds_from_memory((const uint8_t *)fdata, fsz);
+        SDL_free(fdata);
+        if (tex) return tex;
+    }
+    SDL_Surface *surf = IMG_Load(path);
+    if (!surf) return NULL;
+    G3DTexture *tex = texture_from_surface(surf);
+    SDL_FreeSurface(surf);
+    return tex;
+}
+
+/* Load a cgltf image to a G3DTexture, handling DDS (block-compressed, GPU-native)
+   and everything SDL2_image can decode (PNG/JPG/...), embedded or external. */
+static G3DTexture *load_image_texture(cgltf_image *img, const char *gltf_path) {
+    if (!img) return NULL;
+
+    /* Embedded in the .glb buffer: we have the raw bytes directly. */
+    if (img->buffer_view) {
+        cgltf_buffer_view *bv = img->buffer_view;
+        const uint8_t *bytes = (const uint8_t *)bv->buffer->data + bv->offset;
+        if (bv->size >= 4 && memcmp(bytes, "DDS ", 4) == 0)
+            return load_dds_from_memory(bytes, bv->size);
+        SDL_RWops *rw = SDL_RWFromConstMem(bytes, (int)bv->size);
+        if (!rw) return NULL;
+        SDL_Surface *surf = IMG_Load_RW(rw, 1);
+        if (!surf) return NULL;
+        G3DTexture *tex = texture_from_surface(surf);
+        SDL_FreeSurface(surf);
+        return tex;
+    }
+
+    /* External file. */
+    if (img->uri && strncmp(img->uri, "data:", 5) != 0) {
+        char dir[512];
+        strncpy(dir, gltf_path ? gltf_path : "", sizeof(dir) - 1);
+        dir[sizeof(dir) - 1] = '\0';
+        char *slash = strrchr(dir, '/');
+        if (slash) slash[1] = '\0'; else dir[0] = '\0';
+        char path[800];
+        snprintf(path, sizeof(path), "%s%s", dir, img->uri);
+
+        G3DTexture *tex = load_file_texture(path);
+        if (tex) return tex;
+
+        /* The URI file is missing or its format unsupported. Many exports
+           (MSFT_texture_dds and friends) reference one extension but ship the
+           sibling: e.g. cgltf hands us a .png that isn't on disk while the real
+           texture next to it is a .dds (BC7/DXT, now supported). Try swapping
+           .png/.jpg <-> .dds and load the sibling that actually exists. */
+        size_t plen = strlen(path);
+        if (plen > 4 && path[plen-4] == '.') {
+            const char *ext = path + plen - 3;
+            char alt[800];
+            alt[0] = '\0';
+            if (!strcasecmp(ext, "png") || !strcasecmp(ext, "jpg") || !strcasecmp(ext, "jpeg"))
+                snprintf(alt, sizeof(alt), "%.*sdds", (int)(plen - 3), path);
+            else if (!strcasecmp(ext, "dds"))
+                snprintf(alt, sizeof(alt), "%.*spng", (int)(plen - 3), path);
+            if (alt[0]) return load_file_texture(alt);
+        }
+        return NULL;
+    }
+    return NULL;
+}
+
 static G3DTexture *gltf_load_base_color(cgltf_material *mat,
                                         const char *gltf_path) {
     cgltf_texture *t = pick_albedo_texture(mat);
     if (!t || !t->image)
         return NULL;
-    SDL_Surface *surf = decode_image(t->image, gltf_path);
-    if (!surf) {
+    G3DTexture *tex = load_image_texture(t->image, gltf_path);
+    if (!tex)
         fprintf(stderr, "G3D: glTF base-colour texture could not be decoded\n");
-        return NULL;
-    }
-    G3DTexture *tex = texture_from_surface(surf);
-    SDL_FreeSurface(surf);
     return tex;
 }
 

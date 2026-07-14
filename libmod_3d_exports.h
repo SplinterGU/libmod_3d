@@ -73,7 +73,6 @@ int64_t g3d_entity_set_material_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_entity_set_alpha_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_entity_set_color_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_entity_set_blend_bgd(INSTANCE *my, int64_t *params);
-int64_t g3d_entity_use_locals_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_camera_create_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_camera_set_active_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_camera_set_position_bgd(INSTANCE *my, int64_t *params);
@@ -89,6 +88,7 @@ int64_t g3d_model_mesh_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_texture_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_submesh_count_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_height_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_model_size_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_orient_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_anim_count_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_anim_duration_bgd(INSTANCE *my, int64_t *params);
@@ -349,6 +349,7 @@ DLSYSFUNCS __bgdexport(libmod_3d, functions_exports)[] = {
     FUNC("G3D_MODEL_TEXTURE", "I", TYPE_INT, g3d_model_texture_bgd),
     FUNC("G3D_MODEL_SUBMESH_COUNT", "I", TYPE_INT, g3d_model_submesh_count_bgd),
     FUNC("G3D_MODEL_HEIGHT", "I", TYPE_FLOAT, g3d_model_height_bgd),
+    FUNC("G3D_MODEL_SIZE", "I", TYPE_FLOAT, g3d_model_size_bgd),
     FUNC("G3D_MODEL_ORIENT", "IFFF", TYPE_INT, g3d_model_orient_bgd),
     FUNC("G3D_MODEL_ANIM_COUNT", "I", TYPE_INT, g3d_model_anim_count_bgd),
     FUNC("G3D_MODEL_ANIM_DURATION", "II", TYPE_FLOAT, g3d_model_anim_duration_bgd),
@@ -583,7 +584,6 @@ DLSYSFUNCS __bgdexport(libmod_3d, functions_exports)[] = {
     FUNC("G3D_ENTITY_SET_ALPHA", "II", TYPE_INT, g3d_entity_set_alpha_bgd),
     FUNC("G3D_ENTITY_SET_COLOR", "IIII", TYPE_INT, g3d_entity_set_color_bgd),
     FUNC("G3D_ENTITY_SET_BLEND", "II", TYPE_INT, g3d_entity_set_blend_bgd),
-    FUNC("G3D_ENTITY_USE_LOCALS", "I", TYPE_INT, g3d_entity_use_locals_bgd),
     FUNC("G3D_MATERIAL_SET_TEXTURE", "III", TYPE_INT, g3d_material_set_texture_bgd),
     FUNC("G3D_MATERIAL_SET_MAP", "III", TYPE_INT, g3d_material_set_map_bgd),
     FUNC("G3D_MODEL_SUBMESH_MAP", "III", TYPE_INT, g3d_model_submesh_map_bgd),

@@ -301,27 +301,6 @@ int64_t g3d_entity_set_blend_bgd(INSTANCE *my, int64_t *params) {
     return g3d_entity_impl_set_blend((int)params[0], (int)params[1]);
 }
 
-/* Make the entity obey the CALLING process' own reserved locals - the SAME
-   `alpha` / `color_r,g,b` / `blend_mode` the 2D painter reads. Call it each frame
-   from the process that owns the entity and the 3D model follows its
-   alpha/colour/blend with zero extra bookkeeping:  g3d_entity_use_locals(myent); */
-int64_t g3d_entity_use_locals_bgd(INSTANCE *my, int64_t *params) {
-    int entity_id = (int)params[0];
-    if (LOCEXISTS(libmod_3d, LOC3D_ALPHA))
-        g3d_entity_impl_set_alpha(entity_id,
-                                  (float)LOCBYTE(libmod_3d, my, LOC3D_ALPHA) / 255.0f);
-    if (LOCEXISTS(libmod_3d, LOC3D_COLORR))
-        g3d_entity_impl_set_color(entity_id,
-                                  (float)LOCBYTE(libmod_3d, my, LOC3D_COLORR) / 255.0f,
-                                  (float)LOCBYTE(libmod_3d, my, LOC3D_COLORG) / 255.0f,
-                                  (float)LOCBYTE(libmod_3d, my, LOC3D_COLORB) / 255.0f);
-    if (LOCEXISTS(libmod_3d, LOC3D_BLENDMODE))
-        g3d_entity_impl_set_blend(entity_id,
-                                  (int)LOCINT64(libmod_3d, my, LOC3D_BLENDMODE));
-    return 1;
-}
-
-
 int64_t g3d_entity_set_parent_bgd(INSTANCE *my, int64_t *params) {
     int entity_id = (int)params[0];
     int parent_id = (int)params[1];
@@ -759,6 +738,25 @@ int64_t g3d_model_height_bgd(INSTANCE *my, int64_t *params) {
         h = ymax - ymin;
     }
     return (int64_t) * (int32_t *)&h;
+}
+
+/* Largest overall extent (max of width/height/depth) across ALL submeshes.
+   Use it to frame a whole model with a free camera regardless of its scale. */
+int64_t g3d_model_size_bgd(INSTANCE *my, int64_t *params) {
+    G3DModel *model = (G3DModel *)(intptr_t)params[0];
+    float s = 0.0f;
+    if (model && model->mesh_count > 0) {
+        float mn[3], mx[3];
+        for (int k = 0; k < 3; k++) { mn[k] = model->meshes[0].aabb_min[k]; mx[k] = model->meshes[0].aabb_max[k]; }
+        for (uint32_t i = 1; i < model->mesh_count; i++)
+            for (int k = 0; k < 3; k++) {
+                if (model->meshes[i].aabb_min[k] < mn[k]) mn[k] = model->meshes[i].aabb_min[k];
+                if (model->meshes[i].aabb_max[k] > mx[k]) mx[k] = model->meshes[i].aabb_max[k];
+            }
+        float ex = mx[0] - mn[0], ey = mx[1] - mn[1], ez = mx[2] - mn[2];
+        s = ex; if (ey > s) s = ey; if (ez > s) s = ez;
+    }
+    return (int64_t) * (int32_t *)&s;
 }
 
 int64_t g3d_model_submesh_bgd(INSTANCE *my, int64_t *params) {
