@@ -10,7 +10,7 @@ import "libmod_3d";
 
 CONST
     CHUNK = 0.0;     // -1 = chunking auto,  0 = desactivado
-    OCC   = 1;        // 1 = occlusion culling ON, 0 = OFF
+    OCC   = 0;        // 1 = occlusion culling ON, 0 = OFF
     NFRAMES = 400;
 END
 
@@ -47,7 +47,7 @@ BEGIN
 
     // Posicion real de juego: a pie de calle mirando calle abajo
     // (la misma de la captura: cam X -8.0  Y 8.3  Z 10.3)
-    camx = -8.0; camy = 8.3; camz = 10.3;
+    camx = -20.42; camy = 5.97; camz = 1.55;
     yaw = 200.0; pitch = -8.0;
     fwx = sin(yaw * 1000) * cos(pitch * 1000);
     fwy = sin(pitch * 1000);
