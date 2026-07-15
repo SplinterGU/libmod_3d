@@ -1188,6 +1188,28 @@ int64_t g3d_set_fsr_bgd(INSTANCE *my, int64_t *params) {
     g3d_renderer_set_render_scale(on ? scale : 1.0f);
     return 1;
 }
+
+/* Same, but say the render resolution in pixels instead of a fraction: you
+   think "render at 720p and upscale to whatever the window is", not "0.5".
+   Survives a set_mode change, which a fixed fraction wouldn't. The height
+   drives it (the aspect ratio comes from the display). */
+int64_t g3d_set_fsr_height_bgd(INSTANCE *my, int64_t *params) {
+    int on = (int)params[0];
+    int render_h = (int)params[1];
+    float sharp = *(float *)&params[2];
+    uint32_t dw = 0, dh = 0;
+    g3d_renderer_get_display_size(&dw, &dh);
+    g3d_fsr_set_enabled(on);
+    g3d_fsr_set_sharpness(sharp);
+    if (!on || render_h <= 0 || dh == 0) {
+        g3d_renderer_set_render_scale(1.0f);
+        return 1;
+    }
+    float scale = (float)render_h / (float)dh;
+    if (scale > 1.0f) scale = 1.0f;   /* never render above the display */
+    g3d_renderer_set_render_scale(scale);
+    return 1;
+}
 /* Force a re-capture (day/night cycles, a sun that moves at runtime). */
 int64_t g3d_ibl_refresh_bgd(INSTANCE *my, int64_t *params) {
     g3d_ibl_invalidate();
