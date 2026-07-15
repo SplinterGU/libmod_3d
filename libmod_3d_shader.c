@@ -441,6 +441,15 @@ uniform vec3 uCameraPosition;
 uniform vec3 uAmbientLight;
 uniform float uAmbientIntensity;
 uniform int uFlipWinding;   // 1 when the GRAPH render flips Y (inverts winding)
+
+// Image based lighting captured from the sky (see libmod_3d_ibl.c). uHasIBL = 0
+// falls back to flat ambient + the analytic skyEnv gradient.
+uniform int uHasIBL;
+uniform float uIBLIntensity;
+uniform float uPrefilterMips;
+uniform samplerCube uIrradiance;
+uniform samplerCube uPrefilter;
+uniform sampler2D uBRDFLUT;
 uniform float uOpacity;     // entity opacity 0..1 (1 = opaque); < 1 -> transparent pass
 uniform vec3  uEntityColor; // per-entity RGB tint (1,1,1 = none), multiplies albedo
 
@@ -783,14 +792,25 @@ void main() {
         Lo += pbrDirect(N, V, L, albedo, rough, metal, F0, radiance);
     }
 
-    // Ambient / IBL (procedural sky): hemisphere diffuse + environment specular so
-    // metals reflect the sky and every surface gets a subtle fresnel rim reflection.
+    // Ambient / IBL. With uHasIBL the environment is the REAL sky, captured into
+    // cubemaps: cosine-convolved irradiance for diffuse and a roughness-indexed
+    // prefiltered chain + BRDF LUT for specular (split-sum). Without it, fall
+    // back to the old flat ambient + analytic gradient.
     float NdotV = max(dot(N, V), 0.0);
     vec3 Fenv = fresnelRough(NdotV, F0, rough);
-    vec3 env = skyEnv(reflect(-V, N));
     vec3 kdA = (vec3(1.0) - Fenv) * (1.0 - metal);
-    vec3 iblDiff = uAmbientLight * uAmbientIntensity * albedo * kdA;
-    vec3 iblSpec = env * Fenv * (1.0 - rough * 0.6);
+    vec3 R = reflect(-V, N);
+    vec3 iblDiff, iblSpec;
+    if (uHasIBL == 1) {
+        vec3 irradiance = texture(uIrradiance, N).rgb * uIBLIntensity;
+        iblDiff = irradiance * albedo * kdA;
+        vec3 pref = textureLod(uPrefilter, R, rough * (uPrefilterMips - 1.0)).rgb * uIBLIntensity;
+        vec2 ab = texture(uBRDFLUT, vec2(NdotV, rough)).rg;
+        iblSpec = pref * (Fenv * ab.x + ab.y);
+    } else {
+        iblDiff = uAmbientLight * uAmbientIntensity * albedo * kdA;
+        iblSpec = skyEnv(R) * Fenv * (1.0 - rough * 0.6);
+    }
     vec3 result = iblDiff + iblSpec + Lo;
 
     // Lava glows (emissive) so volcano summits stay bright even in shadow.

@@ -3,6 +3,7 @@
  */
 
 #include "libmod_3d_sky.h"
+#include "libmod_3d_ibl.h"
 #include "libmod_3d_shader.h"
 #include "libmod_3d_scene.h"
 #include "libmod_3d_light.h"
@@ -188,6 +189,7 @@ void g3d_sky_set_gradient(float tr, float tg, float tb,
     g_sky.horizon[0] = hr; g_sky.horizon[1] = hg; g_sky.horizon[2] = hb;
     g_sky.tex_handle = 0;
     g_sky.enabled = 1;
+    g3d_ibl_invalidate();   /* the sky IS the environment: re-capture it */
 }
 
 void g3d_sky_set_clouds(float amount, float speed) {
@@ -195,6 +197,7 @@ void g3d_sky_set_clouds(float amount, float speed) {
         return;
     g_sky.cloud_amt = amount < 0.0f ? 0.0f : (amount > 1.0f ? 1.0f : amount);
     g_sky.cloud_speed = speed > 0.0f ? speed : 1.0f;
+    g3d_ibl_invalidate();
 }
 
 void g3d_sky_set_low_clouds(float cover, float base, float thick, float speed) {
@@ -227,6 +230,7 @@ void g3d_sky_set_texture(unsigned int gl_handle) {
         return;
     g_sky.tex_handle = gl_handle;
     g_sky.enabled = 1;
+    g3d_ibl_invalidate();
 }
 
 void g3d_sky_set_enabled(int enabled) {
@@ -235,25 +239,11 @@ void g3d_sky_set_enabled(int enabled) {
     g_sky.enabled = enabled;
 }
 
-void g3d_sky_render_pass(G3DCamera *camera, int flip_y) {
-    if (!g_sky.enabled || !g_sky.initialized || !g_sky.shader || !camera)
-        return;
 #ifndef VITA
-    /* View with translation removed so the sky stays centred on the camera */
-    Mat4 view = g3d_camera_get_view(camera);
-    Mat4 view_rot = view;
-    view_rot.m[12] = 0.0f;
-    view_rot.m[13] = 0.0f;
-    view_rot.m[14] = 0.0f;
-
-    Mat4 proj = g3d_camera_get_projection(camera);
-    if (flip_y) {
-        proj.m[1] = -proj.m[1];
-        proj.m[5] = -proj.m[5];
-        proj.m[9] = -proj.m[9];
-        proj.m[13] = -proj.m[13];
-    }
-
+/* Set every sky uniform and draw the sky cube with the given orientation and
+   projection. Shared by the background pass and the IBL cubemap capture, so the
+   environment the PBR shader lights with is always the sky actually on screen. */
+static void sky_draw(Mat4 view_rot, Mat4 proj) {
     g3d_shader_use(g_sky.shader);
     g3d_shader_set_mat4(g_sky.shader, "uViewRot", view_rot);
     g3d_shader_set_mat4(g_sky.shader, "uProjection", proj);
@@ -294,19 +284,60 @@ void g3d_sky_render_pass(G3DCamera *camera, int flip_y) {
         g3d_shader_set_int(g_sky.shader, "uHasTex", 0);
     }
 
-    /* Background: depth test LEQUAL so it only fills pixels still at the far
-       plane (no opaque geometry), don't write depth, no culling. */
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LEQUAL);
-    glDepthMask(GL_FALSE);
     glDisable(GL_CULL_FACE);
     glDisable(GL_BLEND);
 
     glBindVertexArray(g_sky.vao);
     glDrawArrays(GL_TRIANGLES, 0, 36);
     glBindVertexArray(0);
+}
+#endif
+
+void g3d_sky_render_pass(G3DCamera *camera, int flip_y) {
+    if (!g_sky.enabled || !g_sky.initialized || !g_sky.shader || !camera)
+        return;
+#ifndef VITA
+    /* View with translation removed so the sky stays centred on the camera */
+    Mat4 view = g3d_camera_get_view(camera);
+    Mat4 view_rot = view;
+    view_rot.m[12] = 0.0f;
+    view_rot.m[13] = 0.0f;
+    view_rot.m[14] = 0.0f;
+
+    Mat4 proj = g3d_camera_get_projection(camera);
+    if (flip_y) {
+        proj.m[1] = -proj.m[1];
+        proj.m[5] = -proj.m[5];
+        proj.m[9] = -proj.m[9];
+        proj.m[13] = -proj.m[13];
+    }
+
+    /* Background: depth test LEQUAL so it only fills pixels still at the far
+       plane (no opaque geometry), don't write depth, no culling. */
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+    glDepthMask(GL_FALSE);
+
+    sky_draw(view_rot, proj);
 
     glDepthMask(GL_TRUE);
+#endif
+}
+
+/* Draw the sky into whatever framebuffer is bound, for one cubemap face. No
+   depth state: the capture target has no depth buffer and the sky fills it.
+   Returns 0 when the sky isn't ready yet, so the IBL capture can stay dirty and
+   retry instead of baking a black environment for good. */
+int g3d_sky_render_env(Mat4 view_rot, Mat4 proj) {
+#ifndef VITA
+    if (!g_sky.initialized || !g_sky.shader)
+        return 0;
+    glDisable(GL_DEPTH_TEST);
+    sky_draw(view_rot, proj);
+    return 1;
+#else
+    (void)view_rot; (void)proj;
+    return 0;
 #endif
 }
 

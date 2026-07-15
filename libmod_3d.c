@@ -19,6 +19,7 @@
 #include "libmod_3d_flow.h"
 #include "libmod_3d_particles.h"
 #include "libmod_3d_sky.h"
+#include "libmod_3d_ibl.h"
 #include "libmod_3d_physics.h"
 #include "libmod_3d_anim.h"
 #include "libmod_3d_collide.h"
@@ -1110,6 +1111,18 @@ int64_t g3d_set_shadows_bgd(INSTANCE *my, int64_t *params) {
 /* HDR post pipeline */
 int64_t g3d_set_hdr_bgd(INSTANCE *my, int64_t *params) {
     g3d_renderer_set_hdr((int)params[0]);
+    return 1;
+}
+/* Image based lighting: real reflections/ambient captured from the sky.
+   intensity scales it (1.0 = the sky's own radiance). */
+int64_t g3d_set_ibl_bgd(INSTANCE *my, int64_t *params) {
+    g3d_ibl_set_enabled((int)params[0]);
+    g3d_ibl_set_intensity(*(float *)&params[1]);
+    return 1;
+}
+/* Force a re-capture (day/night cycles, a sun that moves at runtime). */
+int64_t g3d_ibl_refresh_bgd(INSTANCE *my, int64_t *params) {
+    g3d_ibl_invalidate();
     return 1;
 }
 int64_t g3d_set_exposure_bgd(INSTANCE *my, int64_t *params) {

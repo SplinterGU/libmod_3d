@@ -44,6 +44,12 @@ void g3d_sky_set_enabled(int enabled);
    used by the rest of the renderer. */
 void g3d_sky_render_pass(G3DCamera *camera, int flip_y);
 
+/* Draw the sky with an explicit orientation/projection into the bound
+   framebuffer (no depth state). Used by the IBL capture to render the sky into
+   the 6 faces of the environment cubemap. Returns 0 if the sky isn't
+   initialised yet (the caller should retry rather than bake a black env). */
+int g3d_sky_render_env(Mat4 view_rot, Mat4 proj);
+
 /* Free GPU resources. */
 void g3d_sky_shutdown(void);
 

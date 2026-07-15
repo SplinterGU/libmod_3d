@@ -20,6 +20,7 @@
 #include "libmod_3d_particles.h"
 #include "libmod_3d_fire.h"
 #include "libmod_3d_sky.h"
+#include "libmod_3d_ibl.h"
 #include "libmod_3d_cloud_glsl.h"
 #include "libmod_3d_mirror.h"
 #include "libmod_3d_instance.h"
@@ -402,6 +403,10 @@ void g3d_renderer_begin_frame(void) {
         return;
 
 #ifndef VITA
+    /* Refresh the IBL environment before binding our targets (it captures the
+       sky into its own FBO). No-op unless the sky changed. */
+    g3d_ibl_update();
+
     /* HDR on: the scene renders into the internal RGBA16F buffer; end resolves to the host
        FBO. HDR off: render straight into the host FBO (legacy path). */
     if (g_renderer.hdr_active) {
@@ -1618,6 +1623,21 @@ void g3d_renderer_render_mesh(void *mesh, void *material, Mat4 model_matrix,
                                   g_renderer.ambient_color[1],
                                   g_renderer.ambient_color[2]));
     g3d_shader_set_float(shader, "uAmbientIntensity", g_renderer.ambient_intensity);
+
+    /* Image based lighting from the sky: irradiance (diffuse) + prefiltered
+       chain and BRDF LUT (specular). Units 15..17 — 0..14 are taken by albedo,
+       shadow, wall, spot shadows, normal/metal/rough and the biome maps. */
+    if (g3d_ibl_bind(15, 16, 17)) {
+        g3d_shader_set_int(shader, "uHasIBL", 1);
+        g3d_shader_set_int(shader, "uIrradiance", 15);
+        g3d_shader_set_int(shader, "uPrefilter", 16);
+        g3d_shader_set_sampler2d(shader, "uBRDFLUT", 17);
+        g3d_shader_set_float(shader, "uIBLIntensity", g3d_ibl_intensity());
+        g3d_shader_set_float(shader, "uPrefilterMips", g3d_ibl_prefilter_mips());
+        glActiveTexture(GL_TEXTURE0);
+    } else {
+        g3d_shader_set_int(shader, "uHasIBL", 0);
+    }
 
     /* Bind albedo texture (real or 1x1 white fallback) to unit 0 */
     glActiveTexture(GL_TEXTURE0);
