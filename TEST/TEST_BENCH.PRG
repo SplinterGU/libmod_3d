@@ -9,7 +9,9 @@ import "libmod_input";
 import "libmod_3d";
 
 CONST
-    CHUNK = -1.0;     // -1 = chunking auto,  0 = desactivado
+    CHUNK = 0.0;     // -1 = chunking auto,  0 = desactivado
+    OCC   = 1;        // 1 = occlusion culling ON, 0 = OFF
+    NFRAMES = 400;
 END
 
 GLOBAL
@@ -19,7 +21,7 @@ END
 
 PROCESS main()
 PRIVATE
-    int n;
+    int n; int t0; int ms;
     float yaw; float pitch;
     float fwx; float fwy; float fwz;
 BEGIN
@@ -39,6 +41,7 @@ BEGIN
     g3d_set_culling(1);
 
     g3d_gltf_set_chunking(CHUNK);
+    g3d_set_occlusion(OCC);
     model = g3d_load_gltf("assets/niagara_bistro-master/bistro.gltf");
     ent   = g3d_model_spawn(scene, model, 0.0, 0.0, 0.0, 0.0, 0.0);
 
@@ -52,11 +55,21 @@ BEGIN
     g3d_camera_set_position(camera, camx, camy, camz);
     g3d_camera_look_at(camera, camx + fwx, camy + fwy, camz + fwz, 0.0, 1.0, 0.0);
 
-    // Deja correr unos frames y sal: las stats del motor van al log
-    FOR (n = 0; n < 90; n++)
+    // Calienta (el occlusion tiene 1 frame de latencia y la IBL captura una vez)
+    FOR (n = 0; n < 60; n++)
         g3d_camera_set_position(camera, camx, camy, camz);
         g3d_camera_look_at(camera, camx + fwx, camy + fwy, camz + fwz, 0.0, 1.0, 0.0);
         FRAME;
     END
+
+    // Mide: FPS medio sobre NFRAMES (esta vez SI mido FPS, no solo draws)
+    t0 = timer[0];
+    FOR (n = 0; n < NFRAMES; n++)
+        g3d_camera_set_position(camera, camx, camy, camz);
+        g3d_camera_look_at(camera, camx + fwx, camy + fwy, camz + fwz, 0.0, 1.0, 0.0);
+        FRAME;
+    END
+    ms = timer[0] - t0;
+    say("BENCH: " + NFRAMES + " frames en " + ms + " cs  => FPS medio = " + (NFRAMES * 100.0 / ms));
     exit();
 END

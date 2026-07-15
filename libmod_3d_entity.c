@@ -37,6 +37,7 @@ int g3d_entity_impl_spawn(int scene_id, int model_id, float x, float y, float z)
     entity->parent_id = -1;
     entity->active = 1;
     entity->world_matrix_dirty = 1;
+    entity->occ_visible = 1;  /* drawn until a query proves it's hidden */
     entity->opacity = 1.0f;   /* opaque by default */
     entity->tint[0] = entity->tint[1] = entity->tint[2] = 1.0f;   /* no tint */
     entity->blend_mode = G3D_BLEND_NORMAL;

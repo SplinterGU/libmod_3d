@@ -21,6 +21,7 @@
 #include "libmod_3d_fire.h"
 #include "libmod_3d_sky.h"
 #include "libmod_3d_ibl.h"
+#include "libmod_3d_occlusion.h"
 #include "libmod_3d_cloud_glsl.h"
 #include "libmod_3d_mirror.h"
 #include "libmod_3d_instance.h"
@@ -1310,6 +1311,12 @@ static void draw_scene_entities(G3DCamera *camera, int *entities, int entity_cou
             }
         }
 
+        /* Hidden behind other geometry last frame (see libmod_3d_occlusion.c). */
+        if (!g3d_occlusion_visible(entity)) {
+            g_renderer.entities_culled++;
+            continue;
+        }
+
         /* Get material (if any) */
         G3DMaterial *material = NULL;
         if (entity->material_id >= 0) {
@@ -1447,6 +1454,13 @@ void g3d_renderer_render(void) {
     g3d_renderer_forward_pass();
     /* Instanced vegetation/props (opaque, one draw call per group) */
     g3d_instances_render_all(g_renderer.active_camera, g_renderer.flip_y);
+    /* Depth now holds the opaque occluders: test every entity's box against it
+       so the next frame can skip whatever is fully hidden. */
+    {
+        int occ_n = 0;
+        int *occ_e = g3d_scene_impl_get_entities(&occ_n);
+        g3d_occlusion_pass(g_renderer.active_camera, occ_e, occ_n, g_renderer.flip_y);
+    }
     /* Sky fills the background after opaque geometry (depth LEQUAL, far plane) */
     g3d_sky_render_pass(g_renderer.active_camera, g_renderer.flip_y);
     /* Mirror surfaces (opaque) sample their reflection textures */

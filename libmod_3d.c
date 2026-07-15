@@ -20,6 +20,7 @@
 #include "libmod_3d_particles.h"
 #include "libmod_3d_sky.h"
 #include "libmod_3d_ibl.h"
+#include "libmod_3d_occlusion.h"
 #include "libmod_3d_physics.h"
 #include "libmod_3d_anim.h"
 #include "libmod_3d_collide.h"
@@ -1124,6 +1125,11 @@ int64_t g3d_set_hdr_bgd(INSTANCE *my, int64_t *params) {
 int64_t g3d_set_ibl_bgd(INSTANCE *my, int64_t *params) {
     g3d_ibl_set_enabled((int)params[0]);
     g3d_ibl_set_intensity(*(float *)&params[1]);
+    return 1;
+}
+/* Occlusion culling: skip geometry fully hidden behind other geometry. */
+int64_t g3d_set_occlusion_bgd(INSTANCE *my, int64_t *params) {
+    g3d_occlusion_set_enabled((int)params[0]);
     return 1;
 }
 /* Force a re-capture (day/night cycles, a sun that moves at runtime). */

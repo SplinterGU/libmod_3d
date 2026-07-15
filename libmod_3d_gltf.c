@@ -421,8 +421,15 @@ static G3DMesh *build_submesh(cgltf_data *data, cgltf_material *target,
    ============================================================================
  */
 
-/* Chunk cell size: -1 = auto (map-scale models only), 0 = off, >0 = explicit. */
-static float g_gltf_chunk_cell = -1.0f;
+/* Chunk cell size: -1 = auto (map-scale models only), 0 = off, >0 = explicit.
+   OFF by default: measured on Bistro at street level, chunking COSTS frames
+   (522 -> 385 FPS without occlusion culling, 684 -> 563 with it). It does make
+   culling reject much more (298 vs 73 entities, -1M triangles), but this
+   renderer pays ~5.9us of CPU per draw call - render_mesh re-sends ~99
+   uniforms/texture binds every draw - so the +117 draws cost more than the
+   triangles saved. Chunking becomes a win once per-draw cost is cut (frame
+   constants into a UBO); until then it is opt-in via g3d_gltf_set_chunking. */
+static float g_gltf_chunk_cell = 0.0f;
 void g3d_gltf_set_chunking(float cell) { g_gltf_chunk_cell = cell; }
 
 /* Build a mesh that TAKES OWNERSHIP of the buffers: no extra copy, and no
