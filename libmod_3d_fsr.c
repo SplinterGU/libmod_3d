@@ -161,10 +161,16 @@ static int fsr_init(void) {
             "void FsrRcasInputF(inout AF1 r, inout AF1 g, inout AF1 b) {}\n"
             "%s\n"
             "uniform uvec4 uConRcas;\n"
+            "uniform vec2 uOutOffset;\n"
             "out vec4 FragColor;\n"
             "void main() {\n"
             "    AF3 c;\n"
-            "    FsrRcasF(c.r, c.g, c.b, AU2(gl_FragCoord.xy), uConRcas);\n"
+            /* gl_FragCoord is in FRAMEBUFFER space, but we texelFetch the
+               upscaled image, which starts at the viewport origin. With a
+               letterboxed/offset viewport (BennuGD scales its physical viewport
+               and renders into FBO 0) those differ and the image comes out
+               shifted by the offset. */
+            "    FsrRcasF(c.r, c.g, c.b, AU2(gl_FragCoord.xy - uOutOffset), uConRcas);\n"
             "    FragColor = vec4(c, 1.0);\n"
             "}\n",
             FFX_A_GLSL, FFX_FSR1_GLSL);
@@ -243,6 +249,11 @@ void g3d_fsr_apply(unsigned int dst_fbo, int vp_x, int vp_y, int vp_w, int vp_h)
     if (!g_enabled || !g.init || !g.in_tex)
         return;
 
+    /* One line, once: the viewport offset is the thing most likely to be
+       different on someone else's display setup. */
+    { static int once = 0; if (!once) { once = 1;
+        printf("G3D: FSR output viewport = (%d,%d %dx%d) into fbo %u\n",
+               vp_x, vp_y, vp_w, vp_h, dst_fbo); } }
     unsigned int c0[4], c1[4], c2[4], c3[4], cr[4];
     easu_con(c0, c1, c2, c3, (float)g.rw, (float)g.rh,
              (float)g.rw, (float)g.rh, (float)g.dw, (float)g.dh);
@@ -273,6 +284,7 @@ void g3d_fsr_apply(unsigned int dst_fbo, int vp_x, int vp_y, int vp_w, int vp_h)
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, g.up_tex);
     g3d_shader_set_int(g.sh_rcas, "uInput", 0);
+    glUniform2f(g3d_shader_get_uniform(g.sh_rcas, "uOutOffset"), (float)vp_x, (float)vp_y);
     glUniform4uiv(g3d_shader_get_uniform(g.sh_rcas, "uConRcas"), 1, cr);
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
