@@ -22,6 +22,7 @@
 #include "libmod_3d_sky.h"
 #include "libmod_3d_ibl.h"
 #include "libmod_3d_occlusion.h"
+#include "libmod_3d_smaa.h"
 #include "libmod_3d_cloud_glsl.h"
 #include "libmod_3d_mirror.h"
 #include "libmod_3d_instance.h"
@@ -862,12 +863,23 @@ void g3d_renderer_resolve_hdr(void) {
         bloom_src = src;
     }
 
-    /* resolve: HDR + bloom -> host target */
-    glBindFramebuffer(GL_FRAMEBUFFER, g_renderer.target_fbo);
-    if (g_renderer.target_fbo == 0) {
-        glViewport(g_renderer.vp_x, g_renderer.vp_y, g_renderer.vp_w, g_renderer.vp_h);
-    } else {
+    /* resolve: HDR + bloom -> host target. With SMAA on, resolve into its scene
+       buffer instead and let it blend the aliased edges on the way out: it wants
+       a tonemapped LDR image, so this is the point in the frame to do it. */
+    int rvp_x = g_renderer.vp_x, rvp_y = g_renderer.vp_y;
+    int rvp_w = g_renderer.vp_w, rvp_h = g_renderer.vp_h;
+    if (g_renderer.target_fbo != 0) {
+        rvp_x = 0; rvp_y = 0;
+        rvp_w = g_renderer.display_width; rvp_h = g_renderer.display_height;
+    }
+    unsigned int smaa_fbo = g3d_smaa_scene_fbo(g_renderer.display_width,
+                                               g_renderer.display_height);
+    if (smaa_fbo) {
+        glBindFramebuffer(GL_FRAMEBUFFER, smaa_fbo);
         glViewport(0, 0, g_renderer.display_width, g_renderer.display_height);
+    } else {
+        glBindFramebuffer(GL_FRAMEBUFFER, g_renderer.target_fbo);
+        glViewport(rvp_x, rvp_y, rvp_w, rvp_h);
     }
     G3DShaderProgram *ts = (G3DShaderProgram *)g_renderer.tonemap_shader;
     g3d_shader_use(ts);
@@ -883,6 +895,11 @@ void g3d_renderer_resolve_hdr(void) {
     g3d_shader_set_float(ts, "uBloomAmt", g_renderer.bloom_enabled ? g_renderer.bloom_amount : 0.0f);
     g3d_shader_set_int(ts, "uTonemap", g_renderer.tonemap_mode);
     glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindVertexArray(0);
+
+    /* Anti-alias the tonemapped image on its way to the real target. */
+    if (smaa_fbo)
+        g3d_smaa_apply(g_renderer.target_fbo, rvp_x, rvp_y, rvp_w, rvp_h);
 
     glActiveTexture(GL_TEXTURE0);
     glBindVertexArray(0);

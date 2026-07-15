@@ -154,6 +154,7 @@ int64_t g3d_set_shadows_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_set_hdr_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_set_ibl_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_set_occlusion_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_set_smaa_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_ibl_refresh_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_set_exposure_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_set_bloom_bgd(INSTANCE *my, int64_t *params);
@@ -470,6 +471,7 @@ DLSYSFUNCS __bgdexport(libmod_3d, functions_exports)[] = {
     FUNC("G3D_SET_HDR", "I", TYPE_INT, g3d_set_hdr_bgd),
     FUNC("G3D_SET_IBL", "IF", TYPE_INT, g3d_set_ibl_bgd),
     FUNC("G3D_SET_OCCLUSION", "I", TYPE_INT, g3d_set_occlusion_bgd),
+    FUNC("G3D_SET_SMAA", "I", TYPE_INT, g3d_set_smaa_bgd),
     FUNC("G3D_IBL_REFRESH", "", TYPE_INT, g3d_ibl_refresh_bgd),
     FUNC("G3D_SET_EXPOSURE", "F", TYPE_INT, g3d_set_exposure_bgd),
     FUNC("G3D_SET_BLOOM", "IFF", TYPE_INT, g3d_set_bloom_bgd),

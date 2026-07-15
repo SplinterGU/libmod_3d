@@ -18,7 +18,9 @@ import "libmod_input";
 import "libmod_3d";
 
 CONST
-    CHUNK    = 0.0;    // 0.0 = sin trocear (defecto actual),  -1.0 = trocear auto
+    CHUNK    = -1.0;    // 0.0 = sin trocear (defecto actual),  -1.0 = trocear auto
+    RESW     = 1920;   // resolucion: prueba 1280x720 y luego 640x360
+    RESH     = 1080;    //   si los FPS apenas cambian -> NO estas limitado por pixeles
     NWP      = 8;      // puntos del recorrido
     SEGFRAMES = 150;   // frames por tramo
 END
@@ -84,7 +86,7 @@ PROCESS main()
 PRIVATE
     float fps_off; float fps_on; float mh;
 BEGIN
-    set_mode(1280, 720, MODE_WINDOW);
+    set_mode(RESW, RESH, MODE_WINDOW);
     set_fps(0, 0);          // sin limite: queremos medir de verdad
 
     scene = g3d_scene_create("flybench");
@@ -136,6 +138,7 @@ BEGIN
 
     IF (fp)
         fputs(fp, "=== BISTRO FLYBENCH ===");
+        fputs(fp, "resolucion: " + RESW + "x" + RESH);
         fputs(fp, "chunking (0=off, -1=auto): " + CHUNK);
         fputs(fp, "submeshes del modelo: " + g3d_model_submesh_count(model));
         fputs(fp, "");

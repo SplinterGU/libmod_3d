@@ -21,6 +21,7 @@
 #include "libmod_3d_sky.h"
 #include "libmod_3d_ibl.h"
 #include "libmod_3d_occlusion.h"
+#include "libmod_3d_smaa.h"
 #include "libmod_3d_physics.h"
 #include "libmod_3d_anim.h"
 #include "libmod_3d_collide.h"
@@ -1168,6 +1169,11 @@ int64_t g3d_set_ibl_bgd(INSTANCE *my, int64_t *params) {
 /* Occlusion culling: skip geometry fully hidden behind other geometry. */
 int64_t g3d_set_occlusion_bgd(INSTANCE *my, int64_t *params) {
     g3d_occlusion_set_enabled((int)params[0]);
+    return 1;
+}
+/* SMAA 1x anti-aliasing (also the prerequisite for a spatial upscaler). */
+int64_t g3d_set_smaa_bgd(INSTANCE *my, int64_t *params) {
+    g3d_smaa_set_enabled((int)params[0]);
     return 1;
 }
 /* Force a re-capture (day/night cycles, a sun that moves at runtime). */

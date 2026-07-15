@@ -23,7 +23,7 @@ PROCESS main()
 PRIVATE
     float dt; float msens; float spd; float yaw; float pitch;
     float fwx; float fwy; float fwz; float rgx; float rgz;
-    float atime; int fanim; int k4; int nanim;
+    float atime; int fanim; int k4; int nanim; int fsmaa; int k5;
 BEGIN
     set_mode(1920, 1080, MODE_FULLSCREEN);
     set_fps(0, 0);
@@ -58,6 +58,7 @@ BEGIN
     // defecto, tecla 4 para pausar. g3d_model_animate_all reproduce TODAS a la vez.
     nanim = g3d_model_anim_count(model);
     fanim = 1; atime = 0.0;
+    fsmaa = 1; g3d_set_smaa(1);
 
     // LOD, niebla y camara/velocidad relativas al tamano real
     g3d_set_lod(mh * 3.0);
@@ -72,8 +73,9 @@ BEGIN
     g3d_mouse_capture(1);
 
     write(0, 10, 10, 0, "BISTRO - WASD+raton volar - SHIFT rapido - CTRL turbo - ESC salir");
-    write(0, 10, 30, 0, "1 sombras  2 niebla  3 culling  4 animaciones");
+    write(0, 10, 30, 0, "1 sombras  2 niebla  3 culling  4 animaciones  5 SMAA (antialias)");
     write(0, 520, 30, 0, "animaciones:"); write_var(0, 640, 30, 0, nanim);
+    write(0, 700, 30, 0, "SMAA:"); write_var(0, 760, 30, 0, fsmaa);
     write(0, 10, 54, 0, "cam X:"); write_var(0,  60, 54, 0, camx);
     write(0, 200, 54, 0, "Y:");    write_var(0, 225, 54, 0, camy);
     write(0, 360, 54, 0, "Z:");    write_var(0, 385, 54, 0, camz);
@@ -103,6 +105,9 @@ BEGIN
         k3 = key(_3);
         IF (key(_4) AND k4 == 0) fanim = 1 - fanim; END
         k4 = key(_4);
+        // 5 = SMAA on/off: mira los bordes de las farolas y las rejas
+        IF (key(_5) AND k5 == 0) fsmaa = 1 - fsmaa; g3d_set_smaa(fsmaa); END
+        k5 = key(_5);
 
         // Reproduce TODAS las animaciones del glTF a la vez (toldos, ventilador,
         // cesta que se balancea, luz que orbita). Se para con la tecla 4.

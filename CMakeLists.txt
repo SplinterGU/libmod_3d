@@ -96,6 +96,7 @@ set(SOURCES_LIBMOD_3D
     libmod_3d_sky.c
     libmod_3d_ibl.c
     libmod_3d_occlusion.c
+    libmod_3d_smaa.c
     libmod_3d_anim.c
     libmod_3d_collide.c
     libmod_3d_physics.c
