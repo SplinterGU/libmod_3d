@@ -47,7 +47,7 @@ PROCESS main()
 PRIVATE
     float dt; float msens; float spd; float yaw; float pitch;
     float fwx; float fwy; float fwz; float rgx; float rgz;
-    float atime; int nanim;
+    float atime; int nanim; int tprev; int tnow;
 BEGIN
     set_mode(2560, 1440, MODE_WINDOW);
     set_fps(0, 0);              // sin limite: queremos ver el coste real
@@ -94,13 +94,25 @@ BEGIN
     write(0, 10, 74, 0, "FPS:"); write_var(0, 60, 74, 0, frame_info.fps);
     write(0, 10, 1400, 0, "Compara 1 (nativo) contra 4 (720p): mira las rejas y los cables");
 
+    tprev = timer[0];
+
     LOOP
         rw_real = g3d_render_width();
         rh_real = g3d_render_height();
 
-        spd = mh * 0.006;
-        IF (key(_L_SHIFT) OR key(_R_SHIFT)) spd = mh * 0.03; END
-        IF (key(_CONTROL)) spd = mh * 0.1; END
+        // Velocidad POR SEGUNDO, no por frame. Sin esto, FSR duplica los FPS y
+        // duplica la velocidad de vuelo: la escena se te viene encima al doble y
+        // parece que "la imagen se amplia" al cambiar de resolucion. El bug no
+        // estaba en el upscaler, estaba aqui.
+        tnow = timer[0];
+        dt = (tnow - tprev) / 100.0;        // timer[] va en centesimas
+        tprev = tnow;
+        IF (dt > 0.1) dt = 0.1; END         // un paron no debe teleportarte
+        IF (dt <= 0.0) dt = 0.001; END
+
+        spd = mh * 0.36 * dt;
+        IF (key(_L_SHIFT) OR key(_R_SHIFT)) spd = mh * 1.8 * dt; END
+        IF (key(_CONTROL)) spd = mh * 6.0 * dt; END
         g3d_mouse_update();
         yaw = yaw + g3d_mouse_dx() * msens; pitch = pitch - g3d_mouse_dy() * msens;
         IF (pitch > 89.0) pitch = 89.0; END IF (pitch < -89.0) pitch = -89.0; END

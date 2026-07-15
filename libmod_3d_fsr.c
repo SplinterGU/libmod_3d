@@ -249,12 +249,6 @@ void g3d_fsr_apply(unsigned int dst_fbo, int vp_x, int vp_y, int vp_w, int vp_h)
     if (!g_enabled || !g.init || !g.in_tex)
         return;
 
-    /* One line, once: the viewport offset is the thing most likely to be
-       different on someone else's display setup. */
-    { static int once = 0; if (!once) { once = 1;
-        printf("G3D: FSR out viewport=(%d,%d %dx%d) fbo=%u | upscaled tex=%dx%d %s\n",
-               vp_x, vp_y, vp_w, vp_h, dst_fbo, g.dw, g.dh,
-               (vp_w == g.dw && vp_h == g.dh) ? "MATCH" : "MISMATCH -> imagen recortada!"); } }
     unsigned int c0[4], c1[4], c2[4], c3[4], cr[4];
     easu_con(c0, c1, c2, c3, (float)g.rw, (float)g.rh,
              (float)g.rw, (float)g.rh, (float)g.dw, (float)g.dh);
