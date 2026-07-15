@@ -33,6 +33,15 @@ typedef struct {
     int flip_y;                 /* flip projection Y (BennuGD GRAPH); editor=0 */
     uint32_t vp_x, vp_y, vp_w, vp_h; /* physical viewport */
 
+    /* Internal render resolution. Every 3D pass (HDR, SSAO, bloom, SMAA) runs at
+       this size; only the final upscale writes at display size. Equal to the
+       display unless an upscaler is driving it - see g3d_renderer_set_render_scale
+       and libmod_3d_fsr.c. Measured motive: at 1080p, 77% of a frame is pixel
+       work, so rendering fewer pixels is the biggest lever there is. */
+    uint32_t render_width;
+    uint32_t render_height;
+    float render_scale;         /* 1.0 = native */
+
     /* Camera */
     G3DCamera *active_camera;
 
@@ -155,6 +164,13 @@ void g3d_renderer_set_viewport_physical(uint32_t x, uint32_t y, uint32_t w, uint
 
 /* Get the renderer's logical display/viewport size */
 void g3d_renderer_get_display_size(uint32_t *width, uint32_t *height);
+
+/* Internal render resolution as a fraction of the display (1.0 = native).
+   Only useful with an upscaler on (libmod_3d_fsr.c); on its own it just makes
+   the image smaller and stretched. */
+void  g3d_renderer_set_render_scale(float scale);
+float g3d_renderer_get_render_scale(void);
+void  g3d_renderer_get_render_size(uint32_t *w, uint32_t *h);
 
 /* Enable/disable shadow mapping */
 void g3d_renderer_enable_shadows(int enabled, uint32_t resolution);

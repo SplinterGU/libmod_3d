@@ -23,6 +23,7 @@
 #include "libmod_3d_ibl.h"
 #include "libmod_3d_occlusion.h"
 #include "libmod_3d_smaa.h"
+#include "libmod_3d_fsr.h"
 #include "libmod_3d_cloud_glsl.h"
 #include "libmod_3d_mirror.h"
 #include "libmod_3d_instance.h"
@@ -66,6 +67,9 @@ int g3d_renderer_init(uint32_t width, uint32_t height) {
 
     g_renderer.display_width = width;
     g_renderer.display_height = height;
+    g_renderer.render_scale = 1.0f;
+    g_renderer.render_width = width;
+    g_renderer.render_height = height;
 
     /* Load shaders */
     g_renderer.phong_shader =
@@ -268,11 +272,38 @@ void g3d_renderer_set_flip(int flip) {
     g_renderer.flip_y = flip ? 1 : 0;
 }
 
+/* Recompute the internal render size from the display size and the scale. */
+static void update_render_size(void) {
+    float s = g_renderer.render_scale;
+    if (s <= 0.0f || s > 1.0f) s = 1.0f;
+    uint32_t w = (uint32_t)((float)g_renderer.display_width * s + 0.5f);
+    uint32_t h = (uint32_t)((float)g_renderer.display_height * s + 0.5f);
+    g_renderer.render_width  = w > 0 ? w : 1;
+    g_renderer.render_height = h > 0 ? h : 1;
+}
+
 void g3d_renderer_set_viewport_size(uint32_t w, uint32_t h) {
     if (w > 0 && h > 0) {
         g_renderer.display_width = w;
         g_renderer.display_height = h;
+        update_render_size();
     }
+}
+
+/* Render the 3D scene at `scale` of the display and upscale on the way out.
+   1.0 = native. Only useful with an upscaler enabled (see libmod_3d_fsr.c),
+   otherwise the image is just stretched. */
+void g3d_renderer_set_render_scale(float scale) {
+    if (scale <= 0.0f || scale > 1.0f) scale = 1.0f;
+    g_renderer.render_scale = scale;
+    update_render_size();
+}
+
+float g3d_renderer_get_render_scale(void) { return g_renderer.render_scale; }
+
+void g3d_renderer_get_render_size(uint32_t *w, uint32_t *h) {
+    if (w) *w = g_renderer.render_width;
+    if (h) *h = g_renderer.render_height;
 }
 
 void g3d_renderer_get_display_size(uint32_t *width, uint32_t *height) {
@@ -412,7 +443,7 @@ void g3d_renderer_begin_frame(void) {
     /* HDR on: the scene renders into the internal RGBA16F buffer; end resolves to the host
        FBO. HDR off: render straight into the host FBO (legacy path). */
     if (g_renderer.hdr_active) {
-        ensure_hdr_targets(g_renderer.display_width, g_renderer.display_height);
+        ensure_hdr_targets(g_renderer.render_width, g_renderer.render_height);
         g_renderer.framebuffer = g_renderer.hdr_ready ? g_renderer.hdr_fbo : g_renderer.target_fbo;
     } else {
         g_renderer.framebuffer = g_renderer.target_fbo;
@@ -422,7 +453,7 @@ void g3d_renderer_begin_frame(void) {
     if (g_renderer.framebuffer == g_renderer.target_fbo) {
         glViewport(g_renderer.vp_x, g_renderer.vp_y, g_renderer.vp_w, g_renderer.vp_h);
     } else {
-        glViewport(0, 0, g_renderer.display_width, g_renderer.display_height);
+        glViewport(0, 0, g_renderer.render_width, g_renderer.render_height);
     }
 
     /* SDL_gpu leaves GL state that breaks raw rendering: scissor test may be
@@ -622,7 +653,7 @@ uint32_t g3d_renderer_scene_texture(void) { return g_renderer.scene_texture; }
 
 uint32_t g3d_renderer_capture_scene(void) {
 #ifndef VITA
-    uint32_t w = g_renderer.display_width, h = g_renderer.display_height;
+    uint32_t w = g_renderer.render_width, h = g_renderer.render_height;
     if (w == 0 || h == 0) return 0;
     if (!g_renderer.scene_texture) {
         glGenTextures(1, &g_renderer.scene_texture);
@@ -650,7 +681,7 @@ uint32_t g3d_renderer_capture_scene(void) {
 
 uint32_t g3d_renderer_capture_depth(void) {
 #ifndef VITA
-    uint32_t w = g_renderer.display_width, h = g_renderer.display_height;
+    uint32_t w = g_renderer.render_width, h = g_renderer.render_height;
     if (w == 0 || h == 0) return 0;
     if (!g_renderer.scene_depth_tex) {
         glGenTextures(1, &g_renderer.scene_depth_tex);
@@ -729,7 +760,7 @@ void g3d_renderer_underwater_pass(void) {
     /* Draw into the scene framebuffer (HDR fbo when HDR is on); a prior pass may
        have left another FBO bound, which would send the tint nowhere visible. */
     glBindFramebuffer(GL_FRAMEBUFFER, g_renderer.framebuffer);
-    glViewport(0, 0, g_renderer.display_width, g_renderer.display_height);
+    glViewport(0, 0, g_renderer.render_width, g_renderer.render_height);
     g3d_renderer_capture_scene();   /* grab the current frame */
     G3DShaderProgram *sh = (G3DShaderProgram *)g_renderer.post_shader;
     g3d_shader_use(sh);
@@ -863,20 +894,30 @@ void g3d_renderer_resolve_hdr(void) {
         bloom_src = src;
     }
 
-    /* resolve: HDR + bloom -> host target. With SMAA on, resolve into its scene
-       buffer instead and let it blend the aliased edges on the way out: it wants
-       a tonemapped LDR image, so this is the point in the frame to do it. */
+    /* Tail of the frame: tonemap -> [SMAA] -> [FSR upscale] -> host target.
+       Everything before the upscale runs at the render resolution; only the
+       last step writes at display resolution.
+
+       rvp = where the final image lands. smaa/fsr chain their intermediates at
+       render res, so each stage writes to the next one's buffer and whoever is
+       last writes to the real target. */
+    int rw = (int)g_renderer.render_width, rh = (int)g_renderer.render_height;
     int rvp_x = g_renderer.vp_x, rvp_y = g_renderer.vp_y;
     int rvp_w = g_renderer.vp_w, rvp_h = g_renderer.vp_h;
     if (g_renderer.target_fbo != 0) {
         rvp_x = 0; rvp_y = 0;
         rvp_w = g_renderer.display_width; rvp_h = g_renderer.display_height;
     }
-    unsigned int smaa_fbo = g3d_smaa_scene_fbo(g_renderer.display_width,
-                                               g_renderer.display_height);
+    unsigned int fsr_fbo  = g3d_fsr_input_fbo(rw, rh, (int)g_renderer.display_width,
+                                              (int)g_renderer.display_height);
+    unsigned int smaa_fbo = g3d_smaa_scene_fbo(rw, rh);
+    /* Where the tonemap writes: SMAA's input if it's on, else FSR's, else out. */
     if (smaa_fbo) {
         glBindFramebuffer(GL_FRAMEBUFFER, smaa_fbo);
-        glViewport(0, 0, g_renderer.display_width, g_renderer.display_height);
+        glViewport(0, 0, rw, rh);
+    } else if (fsr_fbo) {
+        glBindFramebuffer(GL_FRAMEBUFFER, fsr_fbo);
+        glViewport(0, 0, rw, rh);
     } else {
         glBindFramebuffer(GL_FRAMEBUFFER, g_renderer.target_fbo);
         glViewport(rvp_x, rvp_y, rvp_w, rvp_h);
@@ -897,9 +938,14 @@ void g3d_renderer_resolve_hdr(void) {
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glBindVertexArray(0);
 
-    /* Anti-alias the tonemapped image on its way to the real target. */
-    if (smaa_fbo)
-        g3d_smaa_apply(g_renderer.target_fbo, rvp_x, rvp_y, rvp_w, rvp_h);
+    /* SMAA hands off to FSR when it's on (a spatial upscaler needs an
+       anti-aliased source), otherwise straight to the target. */
+    if (smaa_fbo) {
+        if (fsr_fbo) g3d_smaa_apply(fsr_fbo, 0, 0, rw, rh);
+        else         g3d_smaa_apply(g_renderer.target_fbo, rvp_x, rvp_y, rvp_w, rvp_h);
+    }
+    if (fsr_fbo)
+        g3d_fsr_apply(g_renderer.target_fbo, rvp_x, rvp_y, rvp_w, rvp_h);
 
     glActiveTexture(GL_TEXTURE0);
     glBindVertexArray(0);
@@ -948,7 +994,7 @@ static const char *ssao_blur_frag =
 void g3d_renderer_ssao_pass(void) {
     if (!g_renderer.hdr_active || !g_renderer.ssao_enabled || !g_renderer.hdr_ready) return;
     if (!g_renderer.active_camera) return;
-    uint32_t sw = g_renderer.display_width, sh = g_renderer.display_height;   /* full res = sharp AO */
+    uint32_t sw = g_renderer.render_width, sh = g_renderer.render_height;   /* render res = sharp AO */
     if (sw == 0 || sh == 0) return;
 
     static float kernel[SSAO_KERNEL * 3]; static int kernel_built = 0;
@@ -1037,7 +1083,7 @@ void g3d_renderer_ssao_pass(void) {
     glActiveTexture(GL_TEXTURE0);
     glBindVertexArray(0);
     glBindFramebuffer(GL_FRAMEBUFFER, g_renderer.framebuffer);
-    glViewport(0, 0, g_renderer.display_width, g_renderer.display_height);
+    glViewport(0, 0, g_renderer.render_width, g_renderer.render_height);
     glEnable(GL_DEPTH_TEST);
 }
 
@@ -1103,7 +1149,7 @@ void g3d_renderer_cloud_pass(void) {
     if (!sh || !csh) return;
 
     /* Half-res target (1/4 the pixels for the expensive raymarch). */
-    uint32_t hw = g_renderer.display_width / 2, hh = g_renderer.display_height / 2;
+    uint32_t hw = g_renderer.render_width / 2, hh = g_renderer.render_height / 2;
     if (hw < 1) hw = 1; if (hh < 1) hh = 1;
     if (!g_renderer.cloud_fbo || g_renderer.cloud_w != hw || g_renderer.cloud_h != hh) {
         if (!g_renderer.cloud_fbo) glGenFramebuffers(1, &g_renderer.cloud_fbo);

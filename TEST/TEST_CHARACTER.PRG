@@ -16,6 +16,7 @@ END
 
 PROCESS main()
 PRIVATE
+    int fsmaa; int k5;
     int light; int jmodel; int player; int ch; int i; int nanim;
     int aidle; int awalk; int ajump; int grounded;
     float dt; float t; float msens;
@@ -51,6 +52,7 @@ BEGIN
     g3d_sky_enable(1);
 
     g3d_set_hdr(1);
+    fsmaa = 1; g3d_set_smaa(1);   // 5 = on/off, para juzgar el antialias en la silueta
     g3d_set_tonemap(1);
     g3d_set_exposure(1.0);
     g3d_set_bloom(1, 0.30, 1.1);
@@ -86,6 +88,7 @@ BEGIN
 
     x = 480; y = 270;
     write(0, 10, 10, 0, "WASD andar - SHIFT correr - ESPACIO saltar - raton camara - ESC salir");
+    write(0, 10, 42, 0, "5 = SMAA (antialias):"); write_var(0, 200, 42, 0, fsmaa);
     write(0, 10, 26, 0, "animaciones:"); write_var(0, 150, 26, 0, nanim);
     write(0, 820, 10, 0, "FPS:"); write_var(0, 860, 10, 0, frame_info.fps);
 
@@ -149,6 +152,9 @@ BEGIN
 
         
         
+
+        IF (key(_5) AND k5 == 0) fsmaa = 1 - fsmaa; g3d_set_smaa(fsmaa); END
+        k5 = key(_5);
 
         IF (key(_ESC)) BREAK; END
         FRAME;
