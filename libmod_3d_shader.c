@@ -239,26 +239,39 @@ void g3d_shader_use(G3DShaderProgram *program) {
    ============================================================================
  */
 
+static unsigned int uniform_hash(const char *s) {
+    unsigned int h = 2166136261u;          /* FNV-1a */
+    while (*s) { h ^= (unsigned char)*s++; h *= 16777619u; }
+    return h;
+}
+
 int g3d_shader_get_uniform(G3DShaderProgram *program, const char *name) {
     if (!program || !program->linked)
         return -1;
 
-    /* Check cache first */
+    /* Compare hashes, not strings: this runs ~100 times per draw call and a
+       strcmp scan over the whole cache was a measurable slice of frame time. */
+    unsigned int h = uniform_hash(name);
     for (int i = 0; i < program->uniform_count; i++) {
-        if (strcmp(program->uniform_names[i], name) == 0) {
+        if (program->uniform_hashes[i] == h &&
+            strcmp(program->uniform_names[i], name) == 0) {
             return program->uniform_locations[i];
         }
     }
 
-    /* Not in cache, get from GL */
+    /* Not in cache, ask GL */
 #ifndef VITA
     int location = glGetUniformLocation(program->id, name);
 #else
     int location = -1;
 #endif
 
-    if (location >= 0 && program->uniform_count < G3D_MAX_UNIFORMS) {
+    /* Cache the answer even when it's -1: a uniform the shader doesn't have
+       (or that got optimised out) is asked for on every draw too, and each miss
+       is a driver-side string lookup. */
+    if (program->uniform_count < G3D_MAX_UNIFORMS) {
         program->uniform_locations[program->uniform_count] = location;
+        program->uniform_hashes[program->uniform_count] = h;
         strncpy(program->uniform_names[program->uniform_count], name, 63);
         program->uniform_names[program->uniform_count][63] = '\0';
         program->uniform_count++;

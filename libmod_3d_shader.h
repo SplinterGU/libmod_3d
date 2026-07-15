@@ -59,9 +59,16 @@ typedef struct {
     G3DShader vertex_shader;
     G3DShader fragment_shader;
 
-    /* Uniform cache (for fast lookups) */
-    #define G3D_MAX_UNIFORMS 64
+    /* Uniform location cache. Sized well past what any shader here uses: the
+       PBR program alone declares 68 uniforms, and the indexed ones
+       (uPLPos[i], uSpotShadowMap[k]...) are a separate name each, so a small
+       cache silently overflows and every name past it falls through to
+       glGetUniformLocation on EVERY set - a driver string lookup per uniform
+       per draw. Misses (-1, uniform absent or optimised out) are cached too,
+       for the same reason. Looked up by hash, not a strcmp scan. */
+    #define G3D_MAX_UNIFORMS 256
     int uniform_locations[G3D_MAX_UNIFORMS];
+    unsigned int uniform_hashes[G3D_MAX_UNIFORMS];
     char uniform_names[G3D_MAX_UNIFORMS][64];
     int uniform_count;
 } G3DShaderProgram;
