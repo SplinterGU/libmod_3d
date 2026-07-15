@@ -647,6 +647,14 @@ int64_t g3d_model_animate_blend_bgd(INSTANCE *my, int64_t *params) {
     return 1;
 }
 
+int64_t g3d_model_animate_all_bgd(INSTANCE *my, int64_t *params) {
+    G3DModel *model = (G3DModel *)(intptr_t)params[0];
+    float time = *(float *)&params[1];
+    int loop = (int)params[2];
+    g3d_model_animate_all(model, time, loop);
+    return 1;
+}
+
 int64_t g3d_model_rest_pose_bgd(INSTANCE *my, int64_t *params) {
     G3DModel *model = (G3DModel *)(intptr_t)params[0];
     g3d_model_rest_pose(model);
@@ -902,7 +910,12 @@ int g3d_model_spawn(int scene_id, void *model_ptr, float x, float y, float z,
         int ent = g3d_entity_impl_spawn(scene_id, 0, 0.0f, 0.0f, 0.0f);
         if (ent < 0) continue;
         G3DEntity *e = g3d_entity_impl_get(ent);
-        if (e) e->mesh = &model->meshes[j];
+        if (e) {
+            e->mesh = &model->meshes[j];
+            /* Node-animated submesh: keep a back-pointer so the renderer can
+               apply model->node_global[anim_node] every frame. */
+            e->anim_model = (model->meshes[j].anim_node >= 0) ? (void *)model : NULL;
+        }
         g3d_entity_impl_set_material(ent, mat);
         g3d_entity_impl_set_scale(ent, s, s, s);
         g3d_entity_impl_set_parent(ent, root);               /* child of the root -> moves with it */

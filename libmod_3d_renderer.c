@@ -1311,10 +1311,28 @@ static void draw_scene_entities(G3DCamera *camera, int *entities, int entity_cou
             material = g3d_material_impl_get(entity->material_id);
         }
 
+        /* Node-animated submesh: its vertices are in the glTF node's LOCAL space,
+           so fold the node's animated world transform (+ the model's recenter
+           offset) into the model matrix. Keep the full mesh (no LOD swap) so the
+           moving part stays crisp. */
+        G3DMesh *emesh = (G3DMesh *)entity->mesh;
+        Mat4 draw_matrix = world_matrix;
+        int node_animated = 0;
+        if (emesh && emesh->anim_node >= 0 && entity->anim_model) {
+            G3DModel *am = (G3DModel *)entity->anim_model;
+            if (am->node_global && emesh->anim_node < am->node_count) {
+                Mat4 offm = mat4_translate(am->skin_offset[0], am->skin_offset[1],
+                                           am->skin_offset[2]);
+                Mat4 nodem = mat4_multiply(offm, am->node_global[emesh->anim_node]);
+                draw_matrix = mat4_multiply(world_matrix, nodem);
+                node_animated = 1;
+            }
+        }
+
         /* Automatic LOD: far entities render their auto-generated low-poly mesh.
            Same global g3d_set_lod distance as instanced objects; no game code. */
         void *drawmesh = entity->mesh;
-        if (lodd > 0.0f && !entity->lod_exempt) {
+        if (!node_animated && lodd > 0.0f && !entity->lod_exempt) {
             float ex = world_matrix.m[12] - camera->position.x;
             float ey = world_matrix.m[13] - camera->position.y;
             float ez = world_matrix.m[14] - camera->position.z;
@@ -1324,7 +1342,7 @@ static void draw_scene_entities(G3DCamera *camera, int *entities, int entity_cou
 
         /* Render the entity's mesh (render_mesh recomputes the normal matrix
            from the model matrix internally) */
-        g3d_renderer_render_mesh(drawmesh, material, world_matrix,
+        g3d_renderer_render_mesh(drawmesh, material, draw_matrix,
                                  mat4_identity());
     }
 }

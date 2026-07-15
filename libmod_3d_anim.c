@@ -214,6 +214,63 @@ void g3d_model_animate(G3DModel *model, int anim, float time, int loop) {
     apply_pose(model);
 }
 
+/* Play every animation of the model simultaneously and recompute node world
+   transforms. Works with no skin (pure node TRS: awnings, fans, doors...) and
+   also drives skinning when a skin is present. */
+void g3d_model_animate_all(G3DModel *model, float time, int loop) {
+    if (!model || model->node_count <= 0 || model->animation_count <= 0)
+        return;
+
+    /* Start from the base pose, then let each clip write its own channels. The
+       clips in a scene like Bistro target disjoint nodes, so applying them in
+       sequence composes them correctly. */
+    for (int n = 0; n < model->node_count; n++) {
+        model->node_cur_t[n] = model->node_base_t[n];
+        model->node_cur_r[n] = model->node_base_r[n];
+        model->node_cur_s[n] = model->node_base_s[n];
+    }
+    for (int a = 0; a < model->animation_count; a++) {
+        G3DAnimation *A = &model->animations[a];
+        float t = time;
+        if (A->duration > 1e-6f) {
+            if (loop)                 t = fmodf(time, A->duration);
+            else if (t > A->duration) t = A->duration;
+        }
+        if (t < 0.0f) t = 0.0f;
+        for (int c = 0; c < A->channel_count; c++) {
+            G3DAnimChannel *ch = &A->channels[c];
+            if (ch->node < 0 || ch->node >= model->node_count)
+                continue;
+            float val[4];
+            sample_channel(ch, t, val);
+            if (ch->path == 0)      model->node_cur_t[ch->node] = vec3_make(val[0], val[1], val[2]);
+            else if (ch->path == 1) model->node_cur_r[ch->node] = quat_make(val[0], val[1], val[2], val[3]);
+            else if (ch->path == 2) model->node_cur_s[ch->node] = vec3_make(val[0], val[1], val[2]);
+        }
+    }
+
+    /* Node world transforms (used by node-animated submeshes at render time). */
+    char *done = (char *)calloc(model->node_count, 1);
+    if (!done) return;
+    for (int n = 0; n < model->node_count; n++)
+        node_world(model, n, done);
+    free(done);
+
+    /* If the model is also skinned, update joint matrices and skin the meshes. */
+    if (model->skinned && model->joint_count > 0) {
+        for (int j = 0; j < model->joint_count; j++)
+            model->joint_matrix[j] =
+                mat4_multiply(model->node_global[model->joint_node[j]], model->inverse_bind[j]);
+        if (!model->gpu_skin) {
+            for (uint32_t i = 0; i < model->mesh_count; i++) {
+                G3DMesh *mesh = &model->meshes[i];
+                if (mesh->skinned && mesh->bind_pos && mesh->vjoints)
+                    skin_mesh(mesh, model->joint_matrix, model->joint_count, model->skin_offset);
+            }
+        }
+    }
+}
+
 /* Cross-fade two animations: weight 0 = a0 only, 1 = a1 only. Blends per node
    (lerp translation/scale, slerp rotation). Great for idle<->walk<->run. */
 void g3d_model_animate_blend(G3DModel *model, int a0, float t0,

@@ -94,6 +94,7 @@ int64_t g3d_model_anim_count_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_anim_duration_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_animate_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_animate_blend_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_model_animate_all_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_rest_pose_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_lock_root_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_entity_set_collider_bgd(INSTANCE *my, int64_t *params);
@@ -355,6 +356,7 @@ DLSYSFUNCS __bgdexport(libmod_3d, functions_exports)[] = {
     FUNC("G3D_MODEL_ANIM_DURATION", "II", TYPE_FLOAT, g3d_model_anim_duration_bgd),
     FUNC("G3D_MODEL_ANIMATE", "IIFI", TYPE_INT, g3d_model_animate_bgd),
     FUNC("G3D_MODEL_ANIMATE_BLEND", "IIFIFFI", TYPE_INT, g3d_model_animate_blend_bgd),
+    FUNC("G3D_MODEL_ANIMATE_ALL", "IFI", TYPE_INT, g3d_model_animate_all_bgd),
     FUNC("G3D_MODEL_REST_POSE", "I", TYPE_INT, g3d_model_rest_pose_bgd),
     FUNC("G3D_MODEL_LOCK_ROOT", "II", TYPE_INT, g3d_model_lock_root_bgd),
     FUNC("G3D_ENTITY_SET_COLLIDER", "II", TYPE_INT, g3d_entity_set_collider_bgd),

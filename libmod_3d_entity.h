@@ -27,6 +27,11 @@ typedef struct {
        64-bit pointer in the 32-bit model_id field */
     void *mesh;
 
+    /* Node animation: when this entity's mesh is a node-animated submesh
+       (mesh->anim_node >= 0), anim_model points back to its G3DModel so the
+       renderer can fetch node_global[anim_node] each frame. NULL for static. */
+    void *anim_model;
+
     /* Transform */
     Vec3 position;
     Quat rotation;

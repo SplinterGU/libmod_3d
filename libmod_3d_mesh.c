@@ -58,6 +58,7 @@ G3DMesh *g3d_mesh_create(const char *name, G3DVertex *vertices,
 
     /* Initialize material (will be set later) */
     mesh->material_id = -1;
+    mesh->anim_node = -1;   /* static by default (not a node-animated submesh) */
 
     /* Calculate bounds */
     g3d_mesh_calculate_bounds(mesh);

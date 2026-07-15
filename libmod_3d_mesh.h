@@ -90,6 +90,13 @@ typedef struct {
     float *bind_nrm;            /* vertex_count*3 — raw bind normals */
     uint16_t *vjoints;          /* vertex_count*4 — joint indices (skin-relative) */
     float *vweights;            /* vertex_count*4 — joint weights */
+
+    /* Node animation (non-skinned TRS). >=0 means this submesh is one animated
+       glTF node kept in LOCAL space: the renderer multiplies the entity matrix
+       by model->node_global[anim_node] (+ skin_offset) each frame, so the part
+       moves with its node's animation (awnings, fans, doors...). -1 = static. */
+    int anim_node;
+
     void *lod;                  /* auto-generated low-poly copy (lazy); for entity LOD */
 } G3DMesh;
 

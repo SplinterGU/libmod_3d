@@ -22,6 +22,13 @@ float g3d_model_animation_duration(G3DModel *model, int anim);
    no-op for models without a skin. */
 void g3d_model_animate(G3DModel *model, int anim, float time, int loop);
 
+/* Play ALL of a model's animations at once at `time` seconds and recompute the
+   node world transforms. For scenes (Bistro-style) whose many independent parts
+   each have their own clip on disjoint nodes: awnings, fans, a swinging basket,
+   an orbiting light. Works on non-skinned models (node TRS only); also drives
+   skinning when the model has a skin. */
+void g3d_model_animate_all(G3DModel *model, float time, int loop);
+
 /* Enable GPU skinning for a model: g3d_model_animate then only computes bone
    matrices (cheap) and the instanced skinned shader does the per-vertex work.
    Use with g3d_instances_create_skinned. */
