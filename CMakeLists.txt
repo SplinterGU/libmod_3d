@@ -77,6 +77,7 @@ set(SOURCES_LIBMOD_3D
     libmod_3d_texture.c
     libmod_3d_mesh.c
     libmod_3d_gltf.c
+    libmod_3d_trlevel.c
     libmod_3d_obj.c
     libmod_3d_fbx.c
     ufbx.c

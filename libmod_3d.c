@@ -23,6 +23,7 @@
 #include "libmod_3d_occlusion.h"
 #include "libmod_3d_smaa.h"
 #include "libmod_3d_fsr.h"
+#include "libmod_3d_trlevel.h"
 #include "libmod_3d_physics.h"
 #include "libmod_3d_anim.h"
 #include "libmod_3d_collide.h"
@@ -539,6 +540,25 @@ int64_t g3d_texture_load_bgd(INSTANCE *my, int64_t *params) {
         return -1;
     g3d_texture_upload_gpu(tex);
     return (int64_t)(intptr_t)tex;
+}
+
+/* Load an original Tomb Raider level (.PHD/.TR2/.tr4/.TRC) with no conversion
+   step. Returns the model handle, or -1. */
+int64_t g3d_load_tr_bgd(INSTANCE *my, int64_t *params) {
+    g3d_ensure_init();
+    const char *filename = (const char *)string_get(params[0]);
+    G3DModel *model = g3d_tr_load(filename);
+    string_discard(params[0]);
+    if (!model) return -1;
+    return (int64_t)(intptr_t)model;
+}
+
+/* Which TR game a file is (1..5), 0 if it isn't a level. Doesn't load it. */
+int64_t g3d_tr_probe_bgd(INSTANCE *my, int64_t *params) {
+    const char *filename = (const char *)string_get(params[0]);
+    int v = g3d_tr_probe(filename);
+    string_discard(params[0]);
+    return (int64_t)v;
 }
 
 int64_t g3d_model_load_gltf_bgd(INSTANCE *my, int64_t *params) {
