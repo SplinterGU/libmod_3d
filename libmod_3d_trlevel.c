@@ -259,18 +259,56 @@ static G3DModel *tr_build_rooms(TRReader *r, const char *filepath, int ver,
        obj_stride is the record size (20 in TR1-3, 38 in TR4). */
     unsigned int nobjtex = 0;
     size_t obj_at = 0;
-    for (size_t scan = rooms_end; scan + 4 + (size_t)obj_stride * 32 <= r->size; scan += 2) {
-        unsigned int cnt = (unsigned int)r->d[scan] | ((unsigned int)r->d[scan+1] << 8) |
-                           ((unsigned int)r->d[scan+2] << 16) | ((unsigned int)r->d[scan+3] << 24);
-        if (cnt < 16 || cnt > 40000) continue;
-        if (scan + 4 + (size_t)cnt * obj_stride > r->size) continue;
-        int good = 1, checks = cnt < 32 ? (int)cnt : 32;
-        for (int i = 0; i < checks; i++) {
-            const unsigned char *e = r->d + scan + 4 + (size_t)i * obj_stride;
-            unsigned short tile = (unsigned short)(e[2] | (e[3] << 8)) & 0x7FFF;
-            if (tile >= ntiles) { good = 0; break; }
+    if (ver == G3D_TR4) {
+        /* TR4's mid-file structures changed too much for a content scan (a big
+           run of small-valued zone/overlap data passes any loose validator), so
+           walk them exactly. The object textures sit behind a "TEX" marker after
+           the animated textures. Sizes verified against a real level. */
+        r->at = rooms_end;
+        unsigned int n;
+        n = tr_u32(r); tr_skip(r, (size_t)n * 2);      /* floor data */
+        n = tr_u32(r); tr_skip(r, (size_t)n * 2);      /* mesh data */
+        n = tr_u32(r); tr_skip(r, (size_t)n * 4);      /* mesh pointers */
+        n = tr_u32(r); tr_skip(r, (size_t)n * 40);     /* animations (TR4: 40 B) */
+        n = tr_u32(r); tr_skip(r, (size_t)n * 6);      /* state changes */
+        n = tr_u32(r); tr_skip(r, (size_t)n * 8);      /* anim dispatches */
+        n = tr_u32(r); tr_skip(r, (size_t)n * 2);      /* anim commands */
+        n = tr_u32(r); tr_skip(r, (size_t)n * 4);      /* mesh trees */
+        n = tr_u32(r); tr_skip(r, (size_t)n * 2);      /* frames */
+        n = tr_u32(r); tr_skip(r, (size_t)n * 18);     /* moveables */
+        n = tr_u32(r); tr_skip(r, (size_t)n * 32);     /* static meshes */
+        tr_skip(r, 3);                                 /* "SPR" marker */
+        n = tr_u32(r); tr_skip(r, (size_t)n * 16);     /* sprite textures */
+        n = tr_u32(r); tr_skip(r, (size_t)n * 8);      /* sprite sequences */
+        n = tr_u32(r); tr_skip(r, (size_t)n * 16);     /* cameras */
+        n = tr_u32(r); tr_skip(r, (size_t)n * 40);     /* flyby cameras (TR4) */
+        n = tr_u32(r); tr_skip(r, (size_t)n * 16);     /* sound sources */
+        unsigned int nbox = tr_u32(r); tr_skip(r, (size_t)nbox * 8);  /* boxes (TR4: 8) */
+        n = tr_u32(r); tr_skip(r, (size_t)n * 2);      /* overlaps */
+        tr_skip(r, (size_t)nbox * 20);                 /* zones (TR4) */
+        n = tr_u32(r); tr_skip(r, (size_t)n * 2);      /* animated textures */
+        tr_skip(r, 1);                                 /* animated-texture UV count */
+        tr_skip(r, 3);                                 /* "TEX" marker */
+        nobjtex = tr_u32(r);
+        obj_at = r->at;
+        if (r->overrun || nobjtex == 0 || nobjtex > 40000) nobjtex = 0;
+    } else {
+        /* TR1-3: find the object textures by CONTENT (see TR3 note above): scan
+           forward from the end of the rooms for a count whose entries all
+           reference valid textiles. Self-correcting past undocumented blocks. */
+        for (size_t scan = rooms_end; scan + 4 + (size_t)obj_stride * 32 <= r->size; scan += 2) {
+            unsigned int cnt = (unsigned int)r->d[scan] | ((unsigned int)r->d[scan+1] << 8) |
+                               ((unsigned int)r->d[scan+2] << 16) | ((unsigned int)r->d[scan+3] << 24);
+            if (cnt < 16 || cnt > 40000) continue;
+            if (scan + 4 + (size_t)cnt * obj_stride > r->size) continue;
+            int good = 1, checks = cnt < 32 ? (int)cnt : 32;
+            for (int i = 0; i < checks; i++) {
+                const unsigned char *e = r->d + scan + 4 + (size_t)i * obj_stride;
+                unsigned short tile = (unsigned short)(e[2] | (e[3] << 8)) & 0x7FFF;
+                if (tile >= ntiles) { good = 0; break; }
+            }
+            if (good) { nobjtex = cnt; obj_at = scan + 4; break; }
         }
-        if (good) { nobjtex = cnt; obj_at = scan + 4; break; }
     }
 
     /* TR4 object textures put the UVs 4 bytes later (an extra u16 NewFlags after
