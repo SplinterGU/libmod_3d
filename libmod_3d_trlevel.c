@@ -156,11 +156,39 @@ static G3DTexture *tr1_build_atlas(const unsigned char *tiles, int ntiles,
     return tex;
 }
 
-static G3DModel *tr1_load(TRReader *r, const char *filepath) {
+static G3DModel *tr123_load(TRReader *r, const char *filepath, int ver) {
+    /* Per-version room layout differences, all verified against real levels:
+         room_vertex : TR1 = 8 bytes (x,y,z,light), TR2/3 = 12 (two lights + attrs)
+         after ambient intensity: TR1 +0, TR2 +2, TR3 +2 extra
+         room light  : TR1 = 18 bytes, TR2/3 = 24
+         room static : TR1 = 18 bytes, TR2/3 = 20
+         room tail   : TR3 has 3 extra bytes (waterScheme, reverbInfo, filler) */
+    int vert_sz   = (ver == G3D_TR1) ? 8  : 12;
+    int light_sz  = (ver == G3D_TR1) ? 18 : 24;
+    int static_sz = (ver == G3D_TR1) ? 18 : 20;
+    /* Bytes between the ambient intensity and the light list: TR2 has 4 extra,
+       TR3 has 2 (measured by brute-force over real levels; getting these two
+       swapped desynchronises from the second room on). */
+    int after_amb = (ver == G3D_TR1) ? 0  : ((ver == G3D_TR2) ? 4 : 2);
+    int room_tail = (ver == G3D_TR3) ? 3  : 0;
+
+    /* Palette: TR1 keeps it at the END of the file, TR2/3 right after the
+       version (which we've already read). Grab TR2/3's now. */
+    const unsigned char *pal = NULL;
+    if (ver != G3D_TR1) {
+        pal = r->d + r->at;
+        tr_skip(r, 768);                 /* 8-bit palette */
+        tr_skip(r, 1024);                /* 16-bit palette (unused here) */
+    }
+
     unsigned int ntiles = tr_u32(r);
     if (r->overrun || ntiles == 0 || ntiles > 64) return NULL;
     const unsigned char *tiles = r->d + r->at;
     tr_skip(r, (size_t)ntiles * TEXTILE_W * TEXTILE_H);
+    /* TR2/3 also carry 16-bit textiles right after the 8-bit ones; we texture
+       from the 8-bit set + palette, so skip them. */
+    if (ver != G3D_TR1)
+        tr_skip(r, (size_t)ntiles * TEXTILE_W * TEXTILE_H * 2);
     tr_skip(r, 4);                       /* unused */
 
     int nrooms = tr_u16(r);
@@ -188,7 +216,7 @@ static G3DModel *tr1_load(TRReader *r, const char *filepath) {
         rm->verts = (G3DVertex *)calloc((size_t)(nv > 0 ? nv : 1), sizeof(G3DVertex));
         for (int v = 0; v < nv; v++) {
             short vx = tr_i16(r), vy = tr_i16(r), vz = tr_i16(r);
-            short light = tr_i16(r);
+            tr_skip(r, (size_t)vert_sz - 6);   /* light(s)/attributes */
             /* Room-local -> world, and TR's Y points DOWN so negate it. */
             rm->verts[v].position[0] = (float)(rm->x + vx);
             rm->verts[v].position[1] = (float)(-vy);
@@ -196,7 +224,6 @@ static G3DModel *tr1_load(TRReader *r, const char *filepath) {
             rm->verts[v].normal[0] = 0.0f;
             rm->verts[v].normal[1] = 1.0f;
             rm->verts[v].normal[2] = 0.0f;
-            (void)light;
         }
 
         /* Worst case every face is a quad: 2 triangles, 6 indices. */
@@ -231,9 +258,11 @@ static G3DModel *tr1_load(TRReader *r, const char *filepath) {
         int npor = tr_u16(r); tr_skip(r, (size_t)npor * 32);
         int nz = tr_u16(r), nx = tr_u16(r); tr_skip(r, (size_t)nz * nx * 8);
         tr_skip(r, 2);                   /* ambient intensity */
-        int nl = tr_u16(r); tr_skip(r, (size_t)nl * 18);
-        int nsm = tr_u16(r); tr_skip(r, (size_t)nsm * 18);
+        tr_skip(r, (size_t)after_amb);   /* TR2/3: extra ambient/light-mode */
+        int nl = tr_u16(r); tr_skip(r, (size_t)nl * light_sz);
+        int nsm = tr_u16(r); tr_skip(r, (size_t)nsm * static_sz);
         tr_skip(r, 4);                   /* alternate room + flags */
+        tr_skip(r, (size_t)room_tail);   /* TR3: waterScheme, reverbInfo, filler */
         if (r->overrun) break;
     }
 
@@ -271,23 +300,24 @@ static G3DModel *tr1_load(TRReader *r, const char *filepath) {
         }
     }
 
-    /* Palette lives at the very end in TR1, so jump the rest to reach it. */
-    n = tr_u32(r); tr_skip(r, (size_t)n * 16);     /* sprite textures */
-    n = tr_u32(r); tr_skip(r, (size_t)n * 8);      /* sprite sequences */
-    n = tr_u32(r); tr_skip(r, (size_t)n * 16);     /* cameras */
-    n = tr_u32(r); tr_skip(r, (size_t)n * 16);     /* sound sources */
-    unsigned int nbox = tr_u32(r); tr_skip(r, (size_t)nbox * 20);
-    n = tr_u32(r); tr_skip(r, (size_t)n * 2);      /* overlaps */
-    tr_skip(r, (size_t)nbox * 2 * 6);              /* zones */
-    n = tr_u32(r); tr_skip(r, (size_t)n * 2);      /* animated textures */
-    n = tr_u32(r); tr_skip(r, (size_t)n * 22);     /* entities */
-    tr_skip(r, 8192);                              /* lightmap */
-
-    const unsigned char *pal = NULL;
-    if (!r->overrun && r->at + 768 <= r->size) pal = r->d + r->at;
+    /* TR1's palette is at the very END of the file, so keep walking to reach it.
+       TR2/3 already gave us the palette up top, so stop here. */
+    if (ver == G3D_TR1) {
+        n = tr_u32(r); tr_skip(r, (size_t)n * 16);     /* sprite textures */
+        n = tr_u32(r); tr_skip(r, (size_t)n * 8);      /* sprite sequences */
+        n = tr_u32(r); tr_skip(r, (size_t)n * 16);     /* cameras */
+        n = tr_u32(r); tr_skip(r, (size_t)n * 16);     /* sound sources */
+        unsigned int nbox = tr_u32(r); tr_skip(r, (size_t)nbox * 20);
+        n = tr_u32(r); tr_skip(r, (size_t)n * 2);      /* overlaps */
+        tr_skip(r, (size_t)nbox * 2 * 6);              /* zones */
+        n = tr_u32(r); tr_skip(r, (size_t)n * 2);      /* animated textures */
+        n = tr_u32(r); tr_skip(r, (size_t)n * 22);     /* entities */
+        tr_skip(r, 8192);                              /* lightmap */
+        if (!r->overrun && r->at + 768 <= r->size) pal = r->d + r->at;
+    }
 
     if (!pal || !otex) {
-        fprintf(stderr, "G3D: TR1 parse failed before the palette: %s\n", filepath);
+        fprintf(stderr, "G3D: TR%d parse failed before the palette: %s\n", ver, filepath);
         for (int i = 0; i < nrooms; i++) { free(rooms[i].verts); free(rooms[i].idx); free(face_tex[i]); }
         free(rooms); free(face_tex); free(face_n); free(otex);
         return NULL;
@@ -374,8 +404,8 @@ static G3DModel *tr1_load(TRReader *r, const char *filepath) {
     strncpy(model->filepath, filepath, sizeof(model->filepath) - 1);
     g3d_model_calculate_bounds(model);
 
-    printf("G3D: TR1 level loaded: %s (%d rooms, %u textiles, atlas %dx%d)\n",
-           filepath, sub, ntiles, TEXTILE_W, TEXTILE_H * atlas_tiles);
+    printf("G3D: TR%d level loaded: %s (%d rooms, %u textiles, atlas %dx%d)\n",
+           ver, filepath, sub, ntiles, TEXTILE_W, TEXTILE_H * atlas_tiles);
     return model;
 }
 
@@ -403,12 +433,12 @@ G3DModel *g3d_tr_load(const char *filepath) {
     int ver = tr_version_of(magic, filepath);
 
     G3DModel *model = NULL;
-    if (ver == G3D_TR1) {
-        model = tr1_load(&r, filepath);
+    if (ver == G3D_TR1 || ver == G3D_TR2 || ver == G3D_TR3) {
+        model = tr123_load(&r, filepath, ver);
     } else if (ver == G3D_TR_UNKNOWN) {
         fprintf(stderr, "G3D: not a Tomb Raider level (magic 0x%08X): %s\n", magic, filepath);
     } else {
-        fprintf(stderr, "G3D: TR%d levels aren't supported yet (only TR1): %s\n", ver, filepath);
+        fprintf(stderr, "G3D: TR%d levels aren't supported yet (TR1/2/3 only): %s\n", ver, filepath);
     }
     free(data);
     return model;

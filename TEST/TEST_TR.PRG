@@ -15,7 +15,7 @@ import "libmod_input";
 import "libmod_3d";
 
 CONST
-    LEVEL = "/home/ruben/Escritorio/viewer/Tomb-Raider-1-2-3-4-5-Map-viewer-and-levels-master/Tomb-Raider-1/01-Caves.PHD";
+    LEVEL = "/home/ruben/Escritorio/viewer/Tomb-Raider-1-2-3-4-5-Map-viewer-and-levels-master/Tomb-Raider-2/00-Laras-Home.TR2";
 END
 
 GLOBAL
