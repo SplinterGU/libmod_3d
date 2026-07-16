@@ -559,6 +559,211 @@ static G3DModel *tr4_load(TRReader *r, const char *filepath) {
     return model;
 }
 
+/* ---- TR5: uncompressed level data, XELA-chained rooms, float vertices ------ */
+
+/* Read the object textures from a TR5 level-data buffer: they sit behind a
+   "TEX\0" marker, 40 bytes each (TR4's 38 + 2). Returns a malloc'd array. */
+static TRObjTex *tr5_object_textures(const unsigned char *lvl, size_t n,
+                                     unsigned int ntiles, unsigned int *out_count) {
+    *out_count = 0;
+    for (size_t i = 0; i + 8 < n; i++) {
+        if (lvl[i]=='T' && lvl[i+1]=='E' && lvl[i+2]=='X' && lvl[i+3]==0) {
+            size_t off = i + 4;
+            unsigned int cnt = (unsigned int)lvl[off] | ((unsigned int)lvl[off+1]<<8) |
+                               ((unsigned int)lvl[off+2]<<16) | ((unsigned int)lvl[off+3]<<24);
+            if (cnt < 16 || cnt > 40000 || off + 4 + (size_t)cnt * 40 > n) continue;
+            /* validate the first entries reference real textiles */
+            int ok = 1, checks = cnt < 32 ? (int)cnt : 32;
+            for (int k = 0; k < checks; k++) {
+                const unsigned char *e = lvl + off + 4 + (size_t)k * 40;
+                unsigned short tile = (unsigned short)(e[2] | (e[3]<<8)) & 0x7FFF;
+                if (tile >= ntiles) { ok = 0; break; }
+            }
+            if (!ok) continue;
+            TRObjTex *ot = (TRObjTex *)calloc(cnt, sizeof(TRObjTex));
+            if (!ot) return NULL;
+            for (unsigned int k = 0; k < cnt; k++) {
+                const unsigned char *e = lvl + off + 4 + (size_t)k * 40;
+                ot[k].tile = (unsigned short)(e[2] | (e[3]<<8)) & 0x7FFF;
+                for (int c = 0; c < 4; c++) {
+                    const unsigned char *uv = e + 6 + c * 4;   /* attr,tile,newflags then UVs */
+                    ot[k].u[c] = (float)uv[1] / (float)TEXTILE_W;
+                    ot[k].v[c] = (float)uv[3] / (float)TEXTILE_H;
+                }
+            }
+            *out_count = cnt;
+            return ot;
+        }
+    }
+    return NULL;
+}
+
+static G3DModel *tr5_load(TRReader *r, const char *filepath) {
+    unsigned int nroom = tr_u16(r), nobj = tr_u16(r), nbump = tr_u16(r);
+    unsigned int ntiles = nroom + nobj + nbump;
+    if (r->overrun || ntiles == 0 || ntiles > 4096) return NULL;
+
+    unsigned int t32_unc = tr_u32(r), t32_comp = tr_u32(r);
+    const unsigned char *t32_src = r->d + r->at; tr_skip(r, t32_comp);
+    unsigned int u, c;
+    u = tr_u32(r); c = tr_u32(r); tr_skip(r, c);      /* Textile16 */
+    u = tr_u32(r); c = tr_u32(r); tr_skip(r, c);      /* Misc */
+    tr_skip(r, 32);   /* LaraType(u16) + WeatherType(u16) + Filler[28] */
+    /* Level data: NOT compressed in TR5 (uncompressed == compressed size). */
+    unsigned int lvl_unc = tr_u32(r), lvl_comp = tr_u32(r);
+    const unsigned char *lvl = r->d + r->at;
+    (void)u; (void)lvl_comp;
+    if (r->overrun || lvl_unc < 8 || r->at + lvl_unc > r->size) return NULL;
+    size_t N = lvl_unc;
+
+    unsigned char *t32 = tr_inflate(t32_src, t32_comp, t32_unc);
+    if (!t32) { fprintf(stderr, "G3D: TR5 textile inflate failed: %s\n", filepath); return NULL; }
+    G3DTexture *atlas = tr4_build_atlas(t32, (int)ntiles);
+    free(t32);
+
+    unsigned int nobjtex = 0;
+    TRObjTex *otex = tr5_object_textures(lvl, N, ntiles, &nobjtex);
+    if (!otex) { fprintf(stderr, "G3D: TR5 object textures not found: %s\n", filepath); return NULL; }
+
+    unsigned int nrooms = (unsigned int)lvl[4] | ((unsigned int)lvl[5]<<8) |
+                          ((unsigned int)lvl[6]<<16) | ((unsigned int)lvl[7]<<24);
+    if (nrooms == 0 || nrooms > 5000) { free(otex); return NULL; }
+
+    G3DMesh *meshes = (G3DMesh *)calloc(nrooms, sizeof(G3DMesh));
+    void **texs = (void **)calloc(nrooms, sizeof(void *));
+    int sub = 0;
+    size_t ro = 8;   /* first room (after unused u32 + numRooms u32) */
+
+    for (unsigned int rm = 0; rm < nrooms && ro + 8 <= N; rm++) {
+        if (!(lvl[ro]=='X'&&lvl[ro+1]=='E'&&lvl[ro+2]=='L'&&lvl[ro+3]=='A')) break;
+        unsigned int rds = (unsigned int)lvl[ro+4] | ((unsigned int)lvl[ro+5]<<8) |
+                           ((unsigned int)lvl[ro+6]<<16) | ((unsigned int)lvl[ro+7]<<24);
+        size_t base = ro + 8, rend = base + rds;
+        if (rend > N) break;
+        int rx = 0, rz = 0;
+        if (base + 32 <= N) {
+            rx = (int)((unsigned int)lvl[base+20] | ((unsigned int)lvl[base+21]<<8) |
+                       ((unsigned int)lvl[base+22]<<16) | ((unsigned int)lvl[base+23]<<24));
+            rz = (int)((unsigned int)lvl[base+28] | ((unsigned int)lvl[base+29]<<8) |
+                       ((unsigned int)lvl[base+30]<<16) | ((unsigned int)lvl[base+31]<<24));
+        }
+
+        /* Find the vertex run by content: 28-byte records whose position is a
+           room-scale float and whose normal is roughly unit length. Take the
+           LONGEST run in the room (a room can have a short false run of floats
+           before the real vertex list). */
+        size_t vstart = 0; int nverts = 0;
+        for (size_t s = base + 32; s + 28 <= rend; s += 2) {
+            int run = 0; size_t p = s;
+            while (p + 28 <= rend) {
+                float px, py, pz, nx, ny, nz;
+                memcpy(&px, lvl+p, 4); memcpy(&py, lvl+p+4, 4); memcpy(&pz, lvl+p+8, 4);
+                memcpy(&nx, lvl+p+12, 4); memcpy(&ny, lvl+p+16, 4); memcpy(&nz, lvl+p+20, 4);
+                float nl = nx*nx + ny*ny + nz*nz;
+                if (px > -9000 && px < 9000 && py > -9000 && py < 9000 && pz > -9000 && pz < 9000 &&
+                    nl > 0.6f && nl < 1.6f) { run++; p += 28; }
+                else break;
+            }
+            if (run > nverts) { vstart = s; nverts = run; s = p - 2; }   /* longest run */
+        }
+        if (nverts < 3) { ro = rend; continue; }
+
+        G3DVertex *verts = (G3DVertex *)calloc((size_t)nverts, sizeof(G3DVertex));
+        for (int v = 0; v < nverts; v++) {
+            float px, py, pz;
+            memcpy(&px, lvl+vstart+(size_t)v*28, 4);
+            memcpy(&py, lvl+vstart+(size_t)v*28+4, 4);
+            memcpy(&pz, lvl+vstart+(size_t)v*28+8, 4);
+            verts[v].position[0] = (float)rx + px;
+            verts[v].position[1] = -py;          /* TR Y points down */
+            verts[v].position[2] = (float)rz + pz;
+            verts[v].normal[1] = 1.0f;
+        }
+
+        /* Emit expanded triangles directly (position + UV), so rectangles and
+           triangles each map to the right object-texture corners with no
+           second-pass bookkeeping. A face's UVs come from its object texture,
+           one atlas row per tile. */
+        uint32_t fcap = 256, o2 = 0;
+        G3DVertex *fv = (G3DVertex *)malloc(fcap * sizeof(G3DVertex));
+        #define EMIT(vi, ot, corner) do { \
+            if (o2 >= fcap) { fcap *= 2; fv = realloc(fv, fcap * sizeof(G3DVertex)); } \
+            G3DVertex _v = verts[(vi)]; \
+            if (ot) { _v.texcoord[0] = (ot)->u[corner]; \
+                      _v.texcoord[1] = ((ot)->v[corner] + (float)(ot)->tile) / (float)ntiles; } \
+            fv[o2++] = _v; } while (0)
+
+        /* Find where the rectangle run starts (12-byte records: 4 indices < nverts
+           then an object-texture index). Search rather than assume a fixed offset. */
+        #define IS_RECT(s) ( (unsigned short)(lvl[(s)]|(lvl[(s)+1]<<8)) < nverts && \
+                             (unsigned short)(lvl[(s)+2]|(lvl[(s)+3]<<8)) < nverts && \
+                             (unsigned short)(lvl[(s)+4]|(lvl[(s)+5]<<8)) < nverts && \
+                             (unsigned short)(lvl[(s)+6]|(lvl[(s)+7]<<8)) < nverts && \
+                             ((unsigned short)(lvl[(s)+8]|(lvl[(s)+9]<<8))&0x7FFF) < nobjtex )
+        size_t rstart = 0, tstart = 0; int rbest = 0;
+        for (size_t s = base + 32; s + 12 * 4 <= rend; s += 2) {
+            int run = 0; size_t p = s;
+            while (p + 12 <= rend && IS_RECT(p)) { run++; p += 12; }
+            if (run > rbest) { rbest = run; rstart = s; s = p - 2; }   /* longest run */
+        }
+        if (rstart) {
+            size_t s = rstart;
+            for (; s + 12 <= rend && IS_RECT(s); s += 12) {
+                unsigned short vi[4] = { (unsigned short)(lvl[s]|(lvl[s+1]<<8)),
+                    (unsigned short)(lvl[s+2]|(lvl[s+3]<<8)),
+                    (unsigned short)(lvl[s+4]|(lvl[s+5]<<8)),
+                    (unsigned short)(lvl[s+6]|(lvl[s+7]<<8)) };
+                unsigned short t = (lvl[s+8]|(lvl[s+9]<<8)) & 0x7FFF;
+                TRObjTex *ot = (t < nobjtex) ? &otex[t] : NULL;
+                EMIT(vi[0], ot, 0); EMIT(vi[1], ot, 1); EMIT(vi[2], ot, 2);
+                EMIT(vi[0], ot, 0); EMIT(vi[2], ot, 2); EMIT(vi[3], ot, 3);
+            }
+            tstart = s;
+        }
+        #undef IS_RECT
+        /* Triangles (10 B: 3 indices + object texture + flags) follow. */
+        #define IS_TRI(s) ( (unsigned short)(lvl[(s)]|(lvl[(s)+1]<<8)) < nverts && \
+                            (unsigned short)(lvl[(s)+2]|(lvl[(s)+3]<<8)) < nverts && \
+                            (unsigned short)(lvl[(s)+4]|(lvl[(s)+5]<<8)) < nverts && \
+                            ((unsigned short)(lvl[(s)+6]|(lvl[(s)+7]<<8))&0x7FFF) < nobjtex )
+        for (size_t s = tstart; s + 10 <= rend && IS_TRI(s); s += 10) {
+            unsigned short vi[3] = { (unsigned short)(lvl[s]|(lvl[s+1]<<8)),
+                (unsigned short)(lvl[s+2]|(lvl[s+3]<<8)),
+                (unsigned short)(lvl[s+4]|(lvl[s+5]<<8)) };
+            unsigned short t = (lvl[s+6]|(lvl[s+7]<<8)) & 0x7FFF;
+            TRObjTex *ot = (t < nobjtex) ? &otex[t] : NULL;
+            EMIT(vi[0], ot, 0); EMIT(vi[1], ot, 1); EMIT(vi[2], ot, 2);
+        }
+        #undef IS_TRI
+        #undef EMIT
+        free(verts);
+        if (o2 < 3) { free(fv); ro = rend; continue; }
+
+        uint32_t *fi = (uint32_t *)malloc((size_t)o2 * sizeof(uint32_t));
+        for (uint32_t v = 0; v < o2; v++) {
+            fi[v] = v;
+            fv[v].position[0] /= 512.0f; fv[v].position[1] /= 512.0f; fv[v].position[2] /= 512.0f;
+        }
+        G3DMesh *m = g3d_mesh_create("TR5room", fv, o2, fi, o2);
+        free(fv); free(fi);
+        if (m) { g3d_mesh_upload_gpu(m); meshes[sub] = *m; free(m); texs[sub] = atlas; sub++; }
+
+        ro = rend;
+    }
+    free(otex);
+
+    if (sub == 0) { free(meshes); free(texs); return NULL; }
+    G3DModel *model = (G3DModel *)calloc(1, sizeof(G3DModel));
+    if (!model) { free(meshes); free(texs); return NULL; }
+    model->meshes = meshes; model->mesh_count = (uint32_t)sub;
+    model->mesh_textures = texs; model->albedo_texture = atlas;
+    strncpy(model->filepath, filepath, sizeof(model->filepath) - 1);
+    g3d_model_calculate_bounds(model);
+    printf("G3D: TR5 level loaded: %s (%d rooms, %u textiles, %u object textures)\n",
+           filepath, sub, ntiles, nobjtex);
+    return model;
+}
+
 /* ---- entry point --------------------------------------------------------- */
 
 G3DModel *g3d_tr_load(const char *filepath) {
@@ -587,10 +792,10 @@ G3DModel *g3d_tr_load(const char *filepath) {
         model = tr123_load(&r, filepath, ver);
     } else if (ver == G3D_TR4) {
         model = tr4_load(&r, filepath);
-    } else if (ver == G3D_TR_UNKNOWN) {
-        fprintf(stderr, "G3D: not a Tomb Raider level (magic 0x%08X): %s\n", magic, filepath);
+    } else if (ver == G3D_TR5) {
+        model = tr5_load(&r, filepath);
     } else {
-        fprintf(stderr, "G3D: TR%d levels aren't supported yet (TR1-4 only): %s\n", ver, filepath);
+        fprintf(stderr, "G3D: not a Tomb Raider level (magic 0x%08X): %s\n", magic, filepath);
     }
     free(data);
     return model;
