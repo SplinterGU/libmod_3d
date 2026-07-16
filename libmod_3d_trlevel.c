@@ -648,95 +648,79 @@ static G3DModel *tr5_load(TRReader *r, const char *filepath) {
                        ((unsigned int)lvl[base+30]<<16) | ((unsigned int)lvl[base+31]<<24));
         }
 
-        /* Find the vertex run by content: 28-byte records whose position is a
-           room-scale float and whose normal is roughly unit length. Take the
-           LONGEST run in the room (a room can have a short false run of floats
-           before the real vertex list). */
-        size_t vstart = 0; int nverts = 0;
-        for (size_t s = base + 32; s + 28 <= rend; s += 2) {
-            int run = 0; size_t p = s;
-            while (p + 28 <= rend) {
-                float px, py, pz, nx, ny, nz;
-                memcpy(&px, lvl+p, 4); memcpy(&py, lvl+p+4, 4); memcpy(&pz, lvl+p+8, 4);
-                memcpy(&nx, lvl+p+12, 4); memcpy(&ny, lvl+p+16, 4); memcpy(&nz, lvl+p+20, 4);
-                float nl = nx*nx + ny*ny + nz*nz;
-                if (px > -9000 && px < 9000 && py > -9000 && py < 9000 && pz > -9000 && pz < 9000 &&
-                    nl > 0.6f && nl < 1.6f) { run++; p += 28; }
-                else break;
-            }
-            if (run > nverts) { vstart = s; nverts = run; s = p - 2; }   /* longest run */
-        }
-        if (nverts < 3) { ro = rend; continue; }
-
-        G3DVertex *verts = (G3DVertex *)calloc((size_t)nverts, sizeof(G3DVertex));
-        for (int v = 0; v < nverts; v++) {
-            float px, py, pz;
-            memcpy(&px, lvl+vstart+(size_t)v*28, 4);
-            memcpy(&py, lvl+vstart+(size_t)v*28+4, 4);
-            memcpy(&pz, lvl+vstart+(size_t)v*28+8, 4);
-            verts[v].position[0] = (float)rx + px;
-            verts[v].position[1] = -py;          /* TR Y points down */
-            verts[v].position[2] = (float)rz + pz;
-            verts[v].normal[1] = 1.0f;
+        /* TR5 room header (204 bytes) tells us exactly where the geometry is,
+           via TRosettaStone. The offset fields need +208 to become room-data
+           relative (calibrated against real vertex/poly positions - the docs say
+           +216 but +208 is what actually lands on the data here). Indices in the
+           polygons are LAYER-relative, so each layer's polys index into that
+           layer's own vertex block. */
+        #define RDU16(x) ((unsigned)(lvl[(x)] | (lvl[(x)+1]<<8)))
+        #define RDU32(x) ((unsigned)(lvl[(x)] | (lvl[(x)+1]<<8) | (lvl[(x)+2]<<16) | ((unsigned)lvl[(x)+3]<<24)))
+        if (base + 204 > rend) { ro = rend; continue; }
+        /* Field offsets measured against the real file (4 past the published
+           layout): NumLayers @168, LayerOffset @172, VerticesOffset @176,
+           PolyOffset @180. */
+        unsigned num_layers = RDU32(base + 168);
+        size_t K = 208;
+        size_t lay_at  = base + RDU32(base + 172) + K;
+        size_t vert_at = base + RDU32(base + 176) + K;
+        size_t poly_at = base + RDU32(base + 180) + K;
+        if (num_layers == 0 || num_layers > 2048 ||
+            lay_at + (size_t)num_layers * 56 > rend || vert_at > rend || poly_at > rend) {
+            ro = rend; continue;
         }
 
-        /* Emit expanded triangles directly (position + UV), so rectangles and
-           triangles each map to the right object-texture corners with no
-           second-pass bookkeeping. A face's UVs come from its object texture,
-           one atlas row per tile. */
         uint32_t fcap = 256, o2 = 0;
         G3DVertex *fv = (G3DVertex *)malloc(fcap * sizeof(G3DVertex));
-        #define EMIT(vi, ot, corner) do { \
+        #define EMIT(vx, ot, corner) do { \
             if (o2 >= fcap) { fcap *= 2; fv = realloc(fv, fcap * sizeof(G3DVertex)); } \
-            G3DVertex _v = verts[(vi)]; \
+            G3DVertex _v = (vx); \
             if (ot) { _v.texcoord[0] = (ot)->u[corner]; \
                       _v.texcoord[1] = ((ot)->v[corner] + (float)(ot)->tile) / (float)ntiles; } \
             fv[o2++] = _v; } while (0)
 
-        /* Find where the rectangle run starts (12-byte records: 4 indices < nverts
-           then an object-texture index). Search rather than assume a fixed offset. */
-        #define IS_RECT(s) ( (unsigned short)(lvl[(s)]|(lvl[(s)+1]<<8)) < nverts && \
-                             (unsigned short)(lvl[(s)+2]|(lvl[(s)+3]<<8)) < nverts && \
-                             (unsigned short)(lvl[(s)+4]|(lvl[(s)+5]<<8)) < nverts && \
-                             (unsigned short)(lvl[(s)+6]|(lvl[(s)+7]<<8)) < nverts && \
-                             ((unsigned short)(lvl[(s)+8]|(lvl[(s)+9]<<8))&0x7FFF) < nobjtex )
-        size_t rstart = 0, tstart = 0; int rbest = 0;
-        for (size_t s = base + 32; s + 12 * 4 <= rend; s += 2) {
-            int run = 0; size_t p = s;
-            while (p + 12 <= rend && IS_RECT(p)) { run++; p += 12; }
-            if (run > rbest) { rbest = run; rstart = s; s = p - 2; }   /* longest run */
-        }
-        if (rstart) {
-            size_t s = rstart;
-            for (; s + 12 <= rend && IS_RECT(s); s += 12) {
-                unsigned short vi[4] = { (unsigned short)(lvl[s]|(lvl[s+1]<<8)),
-                    (unsigned short)(lvl[s+2]|(lvl[s+3]<<8)),
-                    (unsigned short)(lvl[s+4]|(lvl[s+5]<<8)),
-                    (unsigned short)(lvl[s+6]|(lvl[s+7]<<8)) };
-                unsigned short t = (lvl[s+8]|(lvl[s+9]<<8)) & 0x7FFF;
-                TRObjTex *ot = (t < nobjtex) ? &otex[t] : NULL;
-                EMIT(vi[0], ot, 0); EMIT(vi[1], ot, 1); EMIT(vi[2], ot, 2);
-                EMIT(vi[0], ot, 0); EMIT(vi[2], ot, 2); EMIT(vi[3], ot, 3);
+        size_t vcur = vert_at, pcur = poly_at;
+        for (unsigned L = 0; L < num_layers; L++) {
+            size_t lb = lay_at + (size_t)L * 56;
+            unsigned nlv = RDU16(lb + 0);       /* NumLayerVertices */
+            unsigned nlr = RDU16(lb + 6);       /* NumLayerRectangles */
+            unsigned nlt = RDU16(lb + 8);       /* NumLayerTriangles */
+            if (vcur + (size_t)nlv * 28 > rend) break;
+
+            /* This layer's vertices, room-local -> world (TR Y points down). */
+            G3DVertex *lv = (G3DVertex *)calloc(nlv ? nlv : 1, sizeof(G3DVertex));
+            for (unsigned v = 0; v < nlv; v++) {
+                float px, py, pz;
+                memcpy(&px, lvl+vcur+(size_t)v*28, 4);
+                memcpy(&py, lvl+vcur+(size_t)v*28+4, 4);
+                memcpy(&pz, lvl+vcur+(size_t)v*28+8, 4);
+                lv[v].position[0] = (float)rx + px;
+                lv[v].position[1] = -py;
+                lv[v].position[2] = (float)rz + pz;
+                lv[v].normal[1] = 1.0f;
             }
-            tstart = s;
+            vcur += (size_t)nlv * 28;
+
+            for (unsigned q = 0; q < nlr && pcur + 12 <= rend; q++, pcur += 12) {
+                unsigned a=RDU16(pcur), b=RDU16(pcur+2), cc=RDU16(pcur+4), dd=RDU16(pcur+6);
+                unsigned t=RDU16(pcur+8)&0x7FFF;
+                if (a>=nlv||b>=nlv||cc>=nlv||dd>=nlv) continue;
+                TRObjTex *ot = (t < nobjtex) ? &otex[t] : NULL;
+                EMIT(lv[a], ot, 0); EMIT(lv[b], ot, 1); EMIT(lv[cc], ot, 2);
+                EMIT(lv[a], ot, 0); EMIT(lv[cc], ot, 2); EMIT(lv[dd], ot, 3);
+            }
+            for (unsigned q = 0; q < nlt && pcur + 10 <= rend; q++, pcur += 10) {
+                unsigned a=RDU16(pcur), b=RDU16(pcur+2), cc=RDU16(pcur+4);
+                unsigned t=RDU16(pcur+6)&0x7FFF;
+                if (a>=nlv||b>=nlv||cc>=nlv) continue;
+                TRObjTex *ot = (t < nobjtex) ? &otex[t] : NULL;
+                EMIT(lv[a], ot, 0); EMIT(lv[b], ot, 1); EMIT(lv[cc], ot, 2);
+            }
+            free(lv);
         }
-        #undef IS_RECT
-        /* Triangles (10 B: 3 indices + object texture + flags) follow. */
-        #define IS_TRI(s) ( (unsigned short)(lvl[(s)]|(lvl[(s)+1]<<8)) < nverts && \
-                            (unsigned short)(lvl[(s)+2]|(lvl[(s)+3]<<8)) < nverts && \
-                            (unsigned short)(lvl[(s)+4]|(lvl[(s)+5]<<8)) < nverts && \
-                            ((unsigned short)(lvl[(s)+6]|(lvl[(s)+7]<<8))&0x7FFF) < nobjtex )
-        for (size_t s = tstart; s + 10 <= rend && IS_TRI(s); s += 10) {
-            unsigned short vi[3] = { (unsigned short)(lvl[s]|(lvl[s+1]<<8)),
-                (unsigned short)(lvl[s+2]|(lvl[s+3]<<8)),
-                (unsigned short)(lvl[s+4]|(lvl[s+5]<<8)) };
-            unsigned short t = (lvl[s+6]|(lvl[s+7]<<8)) & 0x7FFF;
-            TRObjTex *ot = (t < nobjtex) ? &otex[t] : NULL;
-            EMIT(vi[0], ot, 0); EMIT(vi[1], ot, 1); EMIT(vi[2], ot, 2);
-        }
-        #undef IS_TRI
         #undef EMIT
-        free(verts);
+        #undef RDU16
+        #undef RDU32
         if (o2 < 3) { free(fv); ro = rend; continue; }
 
         uint32_t *fi = (uint32_t *)malloc((size_t)o2 * sizeof(uint32_t));
