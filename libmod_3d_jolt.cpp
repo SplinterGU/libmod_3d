@@ -22,6 +22,12 @@
 #include <Jolt/Physics/Collision/Shape/MeshShape.h>
 #include <Jolt/Physics/Collision/Shape/HeightFieldShape.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
+#include <Jolt/Physics/Collision/RayCast.h>
+#include <Jolt/Physics/Collision/CastResult.h>
+#include <Jolt/Physics/Collision/CollideShape.h>
+#include <Jolt/Physics/Collision/CollisionCollector.h>
+#include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
+#include <Jolt/Physics/Collision/NarrowPhaseQuery.h>
 #include <thread>
 #include <cstring>
 #include <cmath>
@@ -72,6 +78,7 @@ static float   g_gravity  = 24.0f;
 
 struct JRBody { BodyID id; float hx, hy, hz; float ox, oy, oz; int active; };
 static JRBody g_rb[JRB_MAX];
+static int    g_mesh_count = 0;   /* # of static trimesh colliders (level geometry) */
 
 static void jolt_init() {
     if (g_inited) return;
@@ -227,7 +234,11 @@ int g3d_collider_add_mesh(void *model, int submesh, float x, float y, float z, f
     const float *pos = nullptr; const unsigned int *idx = nullptr;
     int stride = 0, icount = 0;
     int vcount = g3d_physics_submesh_geom(model, submesh, &pos, &stride, &idx, &icount);
-    if (vcount < 3 || icount < 3 || !pos || !idx) return -1;
+    if (vcount < 3 || icount < 3 || !pos || !idx) {
+        printf("G3D jolt: add_mesh submesh %d FALLA (v=%d i=%d pos=%p idx=%p)\n",
+               submesh, vcount, icount, (void*)pos, (void*)idx);
+        return -1;
+    }
     if (scale <= 0.0f) scale = 1.0f;
 
     VertexList verts; verts.reserve(vcount);
@@ -251,6 +262,7 @@ int g3d_collider_add_mesh(void *model, int submesh, float x, float y, float z, f
     if (s < 0) return -1;
     g_rb[s].id = bid; g_rb[s].hx = g_rb[s].hy = g_rb[s].hz = 0.0f;
     g_rb[s].ox = g_rb[s].oy = g_rb[s].oz = 0.0f; g_rb[s].active = 1;
+    g_mesh_count++;
     return s;
 }
 
@@ -260,7 +272,7 @@ void g3d_rigidbody_destroy(int id) {
     bi.RemoveBody(g_rb[id].id); bi.DestroyBody(g_rb[id].id);
     g_rb[id].active = 0;
 }
-void g3d_rigidbody_clear(void) { for (int i = 0; i < JRB_MAX; i++) g3d_rigidbody_destroy(i); }
+void g3d_rigidbody_clear(void) { for (int i = 0; i < JRB_MAX; i++) g3d_rigidbody_destroy(i); g_mesh_count = 0; }
 
 void g3d_rigidbody_step(float dt) {
     if (!g_inited) return;
@@ -327,5 +339,69 @@ static Vec3 jrb_render(int id) {
 float g3d_rigidbody_render_x(int id) { return jrb_ok(id) ? jrb_render(id).GetX() : 0.0f; }
 float g3d_rigidbody_render_y(int id) { return jrb_ok(id) ? jrb_render(id).GetY() : 0.0f; }
 float g3d_rigidbody_render_z(int id) { return jrb_ok(id) ? jrb_render(id).GetZ() : 0.0f; }
+
+/* ========================================================================= */
+/*  Character-controller queries against the Jolt world (used by the custom   */
+/*  capsule controller in libmod_3d_physics.c so it collides with level mesh  */
+/*  colliders added via g3d_collider_add_mesh). No world Update() is needed -  */
+/*  these are narrow-phase queries against the static bodies already present.  */
+/* ========================================================================= */
+
+/* How many static trimesh colliders (level geometry) exist. The char only
+   consults Jolt when this is > 0, so scenes that never call add_mesh (all the
+   heightmap demos) behave exactly as before. */
+int g3d_jolt_mesh_count(void) { return g_mesh_count; }
+
+/* Highest solid Y directly under (x,z), searching down from y_top to y_min.
+   Returns -1e30 if the ray hits nothing (open air below the character). */
+float g3d_jolt_ground_below(float x, float z, float y_top, float y_min) {
+    if (!g_inited || !g_ps || g_mesh_count <= 0) return -1e30f;
+    RVec3 from(x, y_top, z);
+    Vec3  dir(0.0f, y_min - y_top, 0.0f);              /* straight down */
+    RRayCast ray{ from, dir };
+    RayCastResult hit;
+    if (g_ps->GetNarrowPhaseQuery().CastRay(ray, hit))
+        return (float)from.GetY() + hit.mFraction * (float)dir.GetY();
+    return -1e30f;
+}
+
+/* Push a vertical capsule (feet..feet+height, ignoring the low `step` part so
+   small ledges are climbable, not walls) out of the level walls. Moves (*x,*z)
+   in XZ and returns 1 if it had to. Floor/ceiling contacts (near-vertical
+   penetration axis) are left to the ground query. */
+int g3d_jolt_slide_capsule(float *x, float *z, float feet,
+                           float radius, float height, float step) {
+    if (!g_inited || !g_ps || g_mesh_count <= 0) return 0;
+    if (radius < 0.02f) radius = 0.02f;
+    float bottom = feet + (step > 0.0f ? step : 0.0f);
+    float top    = feet + height;
+    if (top - bottom < 2.0f * radius + 0.04f) top = bottom + 2.0f * radius + 0.04f;
+    float halfcyl = (top - bottom) * 0.5f - radius; if (halfcyl < 0.02f) halfcyl = 0.02f;
+    float cy = (bottom + top) * 0.5f;
+
+    /* heap Ref: Jolt shapes are ref-counted; a stack shape (refcount 0) can make
+       the narrow-phase query misbehave. */
+    RefConst<Shape> cap = new CapsuleShape(halfcyl, radius);
+    RMat44 xf = RMat44::sTranslation(RVec3(*x, cy, *z));
+    CollideShapeSettings s;
+    s.mBackFaceMode = EBackFaceMode::CollideWithBackFaces;   /* TR walls are 1-sided */
+    AllHitCollisionCollector<CollideShapeCollector> col;
+    g_ps->GetNarrowPhaseQuery().CollideShape(cap, Vec3::sReplicate(1.0f), xf, s,
+                                             RVec3::sZero(), col);
+    if (col.mHits.empty()) return 0;
+
+    /* resolve the single deepest wall contact (corners settle over a few frames) */
+    float bx = 0.0f, bz = 0.0f, bd = 0.0f;
+    for (const CollideShapeResult &h : col.mHits) {
+        Vec3 ax = h.mPenetrationAxis.NormalizedOr(Vec3::sZero());
+        float d = h.mPenetrationDepth;
+        if (fabsf(ax.GetY()) > 0.7f) continue;             /* floor/ceiling, not a wall */
+        if (d <= bd) continue;
+        bd = d; bx = -ax.GetX() * d; bz = -ax.GetZ() * d;  /* move capsule out */
+    }
+    if (bd <= 0.0f) return 0;
+    *x += bx; *z += bz;
+    return 1;
+}
 
 } /* extern "C" */

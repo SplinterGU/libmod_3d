@@ -31,6 +31,7 @@ void g3d_char_move(int id, float vx, float vz);
 
 /* Jump: if grounded, launch upward at `speed` units/sec. */
 void g3d_char_jump(int id, float speed);
+void g3d_char_set_water(int id, int in_water, float surface_y);
 
 /* Advance one step: gravity + integrate + collide against terrain and boxes. */
 void g3d_char_update(int id, float dt);

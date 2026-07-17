@@ -1,0 +1,2704 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es" xml:lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>libmod_3d — Documentación completa del motor 3D (BennuGD2)</title>
+  <style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+
+ul.task-list[class]{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+font-size: inherit;
+width: 0.8em;
+margin: 0 0.8em 0.2em -1.6em;
+vertical-align: middle;
+}
+.display.math{display: block; text-align: center; margin: 0.5rem auto;}
+
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+  <style type="text/css">:root{
+--bg:#ffffff; --fg:#1b1f24; --muted:#57606a; --border:#d0d7de;
+--code-bg:#f6f8fa; --accent:#0969da; --thead:#f0f3f6; --row:#fafbfc;
+--shadow:0 1px 3px rgba(27,31,36,.08);
+}
+@media (prefers-color-scheme:dark){
+:root{
+--bg:#0d1117; --fg:#e6edf3; --muted:#9198a1; --border:#30363d;
+--code-bg:#161b22; --accent:#4493f8; --thead:#161b22; --row:#0f141a;
+--shadow:0 1px 3px rgba(0,0,0,.4);
+}
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth; background:var(--bg); color:var(--fg)}
+
+body{
+margin:0 auto !important; max-width:1000px !important;
+padding:40px 28px 120px !important;
+background:var(--bg); color:var(--fg);
+font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif !important;
+-webkit-font-smoothing:antialiased;
+hyphens:none !important;
+}
+#TOC{
+border:1px solid var(--border); border-radius:8px; background:var(--code-bg);
+padding:14px 20px 14px 8px; margin:1.5em 0; box-shadow:var(--shadow);
+}
+#TOC::before{content:"Índice"; display:block; font-weight:650; margin:0 0 .4em 1.2em}
+#TOC a{color:var(--accent)}
+h1,h2,h3,h4{line-height:1.25; font-weight:650; margin:1.8em 0 .6em; scroll-margin-top:20px}
+h1{font-size:2.1rem; margin-top:0; border-bottom:2px solid var(--border); padding-bottom:.3em}
+h2{font-size:1.55rem; border-bottom:1px solid var(--border); padding-bottom:.25em; margin-top:2.4em}
+h3{font-size:1.2rem}
+h4{font-size:1.02rem; color:var(--muted)}
+p,li{color:var(--fg)}
+a{color:var(--accent); text-decoration:none}
+a:hover{text-decoration:underline}
+blockquote{
+margin:1.2em 0; padding:.6em 1.1em; border-left:4px solid var(--accent);
+background:var(--code-bg); color:var(--muted); border-radius:0 6px 6px 0;
+}
+blockquote p{margin:.4em 0; color:inherit}
+code{
+font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+font-size:.88em; background:var(--code-bg); padding:.15em .4em; border-radius:5px;
+border:1px solid var(--border);
+}
+pre{
+background:var(--code-bg); border:1px solid var(--border); border-radius:8px;
+padding:14px 16px; overflow-x:auto; box-shadow:var(--shadow); line-height:1.5;
+}
+pre code{background:none; border:none; padding:0; font-size:.85em}
+.table-scroll{overflow-x:auto; margin:1.2em 0; border-radius:8px}
+table{border-collapse:collapse; width:100%; font-size:.92rem; box-shadow:var(--shadow)}
+th,td{border:1px solid var(--border); padding:8px 12px; text-align:left; vertical-align:top}
+th{background:var(--thead); font-weight:600}
+tbody tr:nth-child(even){background:var(--row)}
+td code{white-space:nowrap}
+hr{border:none; border-top:1px solid var(--border); margin:2.5em 0}
+.toc-note{color:var(--muted); font-size:.9rem}
+::selection{background:var(--accent); color:#fff}
+@media (max-width:640px){ .wrap{padding:24px 16px 80px} h1{font-size:1.7rem} table{font-size:.82rem} }
+</style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">libmod_3d — Documentación completa del motor 3D
+(BennuGD2)</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#libmod_3d--documentación-completa-del-motor-3d-para-bennugd2" id="toc-libmod_3d--documentación-completa-del-motor-3d-para-bennugd2">libmod_3d
+— Documentación completa del motor 3D para BennuGD2</a>
+<ul>
+<li><a href="#índice" id="toc-índice">Índice</a></li>
+<li><a href="#1-arquitectura-general" id="toc-1-arquitectura-general">1.
+Arquitectura general</a></li>
+<li><a href="#2-cómo-se-integra-un-módulo-en-bennugd2" id="toc-2-cómo-se-integra-un-módulo-en-bennugd2">2. Cómo se integra un
+módulo en BennuGD2</a>
+<ul>
+<li><a href="#cómo-leer-las-firmas-importante-para-este-documento" id="toc-cómo-leer-las-firmas-importante-para-este-documento">Cómo leer
+las firmas (importante para este documento)</a></li>
+</ul></li>
+<li><a href="#3-compilación-junto-a-bennugd2" id="toc-3-compilación-junto-a-bennugd2">3. Compilación junto a
+BennuGD2</a>
+<ul>
+<li><a href="#31-dependencias" id="toc-31-dependencias">3.1
+Dependencias</a></li>
+<li><a href="#32-build-completo-recomendado" id="toc-32-build-completo-recomendado">3.2 Build completo
+(recomendado)</a></li>
+<li><a href="#33-recompilar-solo-el-módulo-3d-iteración-rápida" id="toc-33-recompilar-solo-el-módulo-3d-iteración-rápida">3.3 Recompilar
+SOLO el módulo 3D (iteración rápida)</a></li>
+<li><a href="#34-compilar-y-ejecutar-un-prg" id="toc-34-compilar-y-ejecutar-un-prg">3.4 Compilar y ejecutar un
+<code>.PRG</code></a></li>
+<li><a href="#35-notas-de-plataforma-del-cmakeliststxt" id="toc-35-notas-de-plataforma-del-cmakeliststxt">3.5 Notas de
+plataforma (del <code>CMakeLists.txt</code>)</a></li>
+</ul></li>
+<li><a href="#4-mapa-de-ficheros-del-código-fuente" id="toc-4-mapa-de-ficheros-del-código-fuente">4. Mapa de ficheros del
+código fuente</a>
+<ul>
+<li><a href="#41-núcleo-e-infraestructura" id="toc-41-núcleo-e-infraestructura">4.1 Núcleo e
+infraestructura</a></li>
+<li><a href="#42-cargadores-de-modelos" id="toc-42-cargadores-de-modelos">4.2 Cargadores de modelos</a></li>
+<li><a href="#43-físicas-y-colisión" id="toc-43-físicas-y-colisión">4.3
+Físicas y colisión</a></li>
+<li><a href="#44-entorno-cielo-y-agua" id="toc-44-entorno-cielo-y-agua">4.4 Entorno, cielo y agua</a></li>
+<li><a href="#45-postproceso-y-culling" id="toc-45-postproceso-y-culling">4.5 Post‑proceso y culling</a></li>
+<li><a href="#46-terreno-y-herramientas-de-mundo" id="toc-46-terreno-y-herramientas-de-mundo">4.6 Terreno y herramientas
+de mundo</a></li>
+<li><a href="#47-mundos-grandes-instancing-y-streaming" id="toc-47-mundos-grandes-instancing-y-streaming">4.7 Mundos grandes:
+instancing y streaming</a></li>
+<li><a href="#48-recursos-vendored" id="toc-48-recursos-vendored">4.8
+Recursos vendored</a></li>
+<li><a href="#49-cloth-simulación-de-tela" id="toc-49-cloth-simulación-de-tela">4.9 Cloth (simulación de
+tela)</a></li>
+</ul></li>
+<li><a href="#5-estructuras-de-datos-principales" id="toc-5-estructuras-de-datos-principales">5. Estructuras de datos
+principales</a></li>
+<li><a href="#6-referencia-de-la-api-por-subsistemas" id="toc-6-referencia-de-la-api-por-subsistemas">6. Referencia de la API
+por subsistemas</a>
+<ul>
+<li><a href="#61-escena" id="toc-61-escena">6.1 Escena</a></li>
+<li><a href="#62-entidades" id="toc-62-entidades">6.2 Entidades</a></li>
+<li><a href="#63-cámaras" id="toc-63-cámaras">6.3 Cámaras</a></li>
+<li><a href="#64-carga-y-consulta-de-modelos" id="toc-64-carga-y-consulta-de-modelos">6.4 Carga y consulta de
+modelos</a></li>
+<li><a href="#65-animación-esqueletal" id="toc-65-animación-esqueletal">6.5 Animación esqueletal</a></li>
+<li><a href="#66-materiales" id="toc-66-materiales">6.6
+Materiales</a></li>
+<li><a href="#67-luces" id="toc-67-luces">6.7 Luces</a></li>
+<li><a href="#68-entorno-y-configuración-de-render" id="toc-68-entorno-y-configuración-de-render">6.8 Entorno y
+configuración de render</a></li>
+<li><a href="#69-cielo" id="toc-69-cielo">6.9 Cielo</a></li>
+<li><a href="#610-agua-superficie-y-océano" id="toc-610-agua-superficie-y-océano">6.10 Agua (superficie y
+océano)</a></li>
+<li><a href="#611-ríos-y-cascadas-flow" id="toc-611-ríos-y-cascadas-flow">6.11 Ríos y cascadas (flow)</a></li>
+<li><a href="#612-fuego-y-partículas" id="toc-612-fuego-y-partículas">6.12 Fuego y partículas</a></li>
+<li><a href="#613-espejos" id="toc-613-espejos">6.13 Espejos</a></li>
+<li><a href="#614-colisión-simple-y-raycast-libmod_3d_collidec" id="toc-614-colisión-simple-y-raycast-libmod_3d_collidec">6.14 Colisión
+simple y raycast (<code>libmod_3d_collide.c</code>)</a></li>
+<li><a href="#615-character-controller-y-física-cinemática-libmod_3d_physicsc--jolt" id="toc-615-character-controller-y-física-cinemática-libmod_3d_physicsc--jolt">6.15
+Character controller y física cinemática
+(<code>libmod_3d_physics.c</code> / Jolt)</a></li>
+<li><a href="#616-rigid-bodies-jolt" id="toc-616-rigid-bodies-jolt">6.16
+Rigid bodies (Jolt)</a></li>
+<li><a href="#617-vehículos" id="toc-617-vehículos">6.17
+Vehículos</a></li>
+<li><a href="#618-instancing-y-scatter-libmod_3d_instancec" id="toc-618-instancing-y-scatter-libmod_3d_instancec">6.18 Instancing y
+<em>scatter</em> (<code>libmod_3d_instance.c</code>)</a></li>
+<li><a href="#619-mundos-grandes-rebase-y-streaming" id="toc-619-mundos-grandes-rebase-y-streaming">6.19 Mundos grandes:
+rebase y streaming</a></li>
+<li><a href="#620-generación-procedural-de-terreno-libmod_3d_worldgenc" id="toc-620-generación-procedural-de-terreno-libmod_3d_worldgenc">6.20
+Generación procedural de terreno
+(<code>libmod_3d_worldgen.c</code>)</a></li>
+<li><a href="#621-escenas-scene-y-consultas-de-mundo-libmod_3d_scenefilec" id="toc-621-escenas-scene-y-consultas-de-mundo-libmod_3d_scenefilec">6.21
+Escenas <code>.scene</code> y consultas de mundo
+(<code>libmod_3d_scenefile.c</code>)</a></li>
+<li><a href="#622-terreno-vóxel-libmod_3d_voxterrainc" id="toc-622-terreno-vóxel-libmod_3d_voxterrainc">6.22 Terreno vóxel
+(<code>libmod_3d_voxterrain.c</code>)</a></li>
+<li><a href="#623-picking-libmod_3d_pickc" id="toc-623-picking-libmod_3d_pickc">6.23 Picking
+(<code>libmod_3d_pick.c</code>)</a></li>
+<li><a href="#624-primitivas-y-edición-de-terreno-libmod_3d_primitivesc--terrainc" id="toc-624-primitivas-y-edición-de-terreno-libmod_3d_primitivesc--terrainc">6.24
+Primitivas y edición de terreno (<code>libmod_3d_primitives.c</code> /
+<code>terrain.c</code>)</a></li>
+<li><a href="#625-pintura-de-terreno-libmod_3d_paintc" id="toc-625-pintura-de-terreno-libmod_3d_paintc">6.25 Pintura de terreno
+(<code>libmod_3d_paint.c</code>)</a></li>
+<li><a href="#626-prefabs-libmod_3d_prefabc" id="toc-626-prefabs-libmod_3d_prefabc">6.26 Prefabs
+(<code>libmod_3d_prefab.c</code>)</a></li>
+<li><a href="#627-tela-libmod_3d_clothc" id="toc-627-tela-libmod_3d_clothc">6.27 Tela
+(<code>libmod_3d_cloth.c</code>)</a></li>
+<li><a href="#628-ratón-captura-relativa" id="toc-628-ratón-captura-relativa">6.28 Ratón (captura
+relativa)</a></li>
+</ul></li>
+<li><a href="#apéndice-a--ejemplos-en-test" id="toc-apéndice-a--ejemplos-en-test">Apéndice A — Ejemplos en
+<code>TEST/</code></a></li>
+<li><a href="#apéndice-b--resumen-de-cómo-compilar-chuleta" id="toc-apéndice-b--resumen-de-cómo-compilar-chuleta">Apéndice B —
+Resumen de cómo compilar (chuleta)</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="libmod_3d--documentación-completa-del-motor-3d-para-bennugd2">libmod_3d
+— Documentación completa del motor 3D para BennuGD2</h1>
+<blockquote>
+<p>Motor de renderizado 3D moderno (OpenGL 3.3+/4.0) integrado como
+<strong>módulo nativo</strong> de BennuGD2. Se importa desde un
+<code>.PRG</code> con <code>import &quot;libmod_3d&quot;;</code> y expone ~350
+funciones <code>G3D_*</code> para escenas, modelos
+(glTF/OBJ/FBX/MD3/Tomb Raider), PBR, sombras, IBL, agua, físicas (Jolt),
+partículas, terreno, mundos grandes, etc.</p>
+<p>Este documento describe <strong>qué contiene cada fichero
+fuente</strong> y <strong>qué hace cada función exportada</strong>,
+además de <strong>cómo compilarlo junto a BennuGD2</strong>.</p>
+</blockquote>
+<hr />
+<h2 id="índice">Índice</h2>
+<ol type="1">
+<li><a href="#1-arquitectura-general">Arquitectura general</a></li>
+<li><a href="#2-cómo-se-integra-un-módulo-en-bennugd2">Cómo se integra
+un módulo en BennuGD2</a></li>
+<li><a href="#3-compilación-junto-a-bennugd2">Compilación junto a
+BennuGD2</a></li>
+<li><a href="#4-mapa-de-ficheros-del-código-fuente">Mapa de ficheros del
+código fuente</a></li>
+<li><a href="#5-estructuras-de-datos-principales">Estructuras de datos
+principales</a></li>
+<li><a href="#6-referencia-de-la-api-por-subsistemas">Referencia de la
+API por subsistemas</a></li>
+</ol>
+<hr />
+<h2 id="1-arquitectura-general">1. Arquitectura general</h2>
+<p>El motor es un <strong>pipeline de renderizado forward</strong>
+con:</p>
+<ul>
+<li><strong>Forward+ con sombras</strong>: shadow mapping (CSM), PBR
+Cook‑Torrance GGX.</li>
+<li><strong>IBL real</strong> generado desde el propio cielo (cubemap de
+irradiancia + prefiltrado + BRDF LUT).</li>
+<li><strong>Post‑proceso</strong>: HDR, tonemapping, bloom, SSAO, SMAA
+(antialias), FSR 1 (reescalado).</li>
+<li><strong>Culling</strong>: frustum + occlusion queries por hardware +
+LOD por distancia.</li>
+<li><strong>Físicas</strong>: backend <strong>Jolt Physics</strong> (por
+defecto) o un fallback cinemático propio.</li>
+<li><strong>Contenido</strong>: cargadores glTF/GLB, OBJ, FBX (ufbx),
+MD3 y niveles nativos de Tomb Raider (TR1–TR5).</li>
+<li><strong>Mundos grandes</strong>: instancing GPU, streaming por
+tiles, generación procedural, <em>world rebase</em> (precisión).</li>
+<li><strong>Herramientas de mundo</strong>: terreno esculpible, pintura
+de texturas, prefabs, ficheros <code>.scene</code>.</li>
+</ul>
+<p>Plataforma principal: <strong>PC (Linux/Windows/macOS), OpenGL
+3.3+/4.0</strong>. Hay ganchos previstos para VITA/Android con
+degradación (renderer alternativo aún no incluido).</p>
+<p>Estado global en <code>g_3d_engine</code> (ver <a href="libmod_3d.h"><code>libmod_3d.h</code></a>): límites fijos de 4096
+entidades, 16 escenas, 16 cámaras, 32 luces, 256 materiales, 512
+modelos, 1024 texturas.</p>
+<hr />
+<h2 id="2-cómo-se-integra-un-módulo-en-bennugd2">2. Cómo se integra un
+módulo en BennuGD2</h2>
+<p>BennuGD2 carga funciones nativas desde una librería dinámica
+(<code>libmod_3d.so</code> / <code>.dll</code> / <code>.dylib</code>).
+El puente está en <a href="libmod_3d_exports.h"><code>libmod_3d_exports.h</code></a>:</p>
+<ul>
+<li><strong><code>constants_def[]</code></strong> — constantes visibles
+en el <code>.PRG</code>: <code>C_3D</code>,
+<code>G3D_LIGHT_DIRECTIONAL/POINT/SPOT</code>,
+<code>C3D_ENTITY/LIGHT/CAMERA</code>.</li>
+<li><strong><code>locals_def</code></strong> — variables locales que se
+inyectan en <strong>cada proceso</strong> cuando se importa el módulo:
+<code>angle_x/y/z</code>, <code>size_z</code>, <code>entity</code>,
+<code>target_x/y/z</code>, <code>fov</code>, <code>intensity</code>,
+<code>range</code>, <code>cone_angle</code>.</li>
+<li><strong><code>functions_exports[]</code></strong> — la tabla
+<code>FUNC(nombre, firma, tipo_retorno, wrapper)</code>.</li>
+<li><strong><code>module_initialize</code> /
+<code>module_finalize</code></strong> — ganchos de carga/descarga.</li>
+</ul>
+<h3 id="cómo-leer-las-firmas-importante-para-este-documento">Cómo leer
+las firmas (importante para este documento)</h3>
+<p>Cada función se declara con
+<code>FUNC(&quot;NOMBRE&quot;, &quot;firma&quot;, TIPO_RETORNO, wrapper_bgd)</code>. La
+cadena de <strong>firma</strong> codifica los parámetros, un carácter
+por parámetro:</p>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: center;">Letra</th>
+<th>Tipo en el <code>.PRG</code></th>
+<th>Significado</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;"><code>I</code></td>
+<td><code>INT</code></td>
+<td>entero (64 bits)</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><code>F</code></td>
+<td><code>FLOAT</code>/<code>DOUBLE</code></td>
+<td>real (en BennuGD2 los <code>FLOAT</code> son
+<code>double</code>)</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;"><code>S</code></td>
+<td><code>STRING</code></td>
+<td>cadena (ruta de fichero, nombre…)</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><code>P</code></td>
+<td>puntero / variable por referencia</td>
+<td><strong>parámetro de salida</strong>: pasas una variable y la
+función la rellena</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;"><code>&quot;&quot;</code></td>
+<td>(vacío)</td>
+<td>sin parámetros</td>
+</tr>
+</tbody>
+</table>
+<p>El tipo de retorno es <code>TYPE_INT</code> o
+<code>TYPE_FLOAT</code>. En este documento, junto a cada función, se
+indica su firma tal cual aparece en la tabla.</p>
+<blockquote>
+<p><strong>Convención de ángulos:</strong> muchas demos multiplican los
+grados por <code>1000</code> (p.ej. <code>sin(yaw * 1000)</code>) porque
+las funciones trigonométricas de BennuGD2 trabajan en <strong>milésimas
+de grado</strong>. Las funciones que reciben rotaciones en el motor
+esperan <strong>grados</strong> (internamente
+<code>g3d_model_spawn</code> convierte con <code>MD2RAD</code>).</p>
+</blockquote>
+<hr />
+<h2 id="3-compilación-junto-a-bennugd2">3. Compilación junto a
+BennuGD2</h2>
+<p>El módulo vive dentro del árbol de BennuGD2 en
+<code>modules/libmod_3d/</code> y se compila como parte del build
+global. Se apoya en librerías del propio BennuGD2: <code>bgdrtm</code>
+(runtime), <code>bggfx</code> (gráficos 2D/ventana) y
+<code>sdlhandler</code>.</p>
+<h3 id="31-dependencias">3.1 Dependencias</h3>
+<ul>
+<li><strong>CMake ≥ 3.5</strong> y un compilador C/C++ (C++17 para
+Jolt).</li>
+<li><strong>SDL2</strong>, <strong>SDL2_image</strong>,
+<strong>OpenGL</strong> (dev packages).</li>
+<li><strong>Jolt Physics</strong>: viene <em>vendored</em> en
+<code>jolt/</code> (MIT). No hace falta submódulo ni red; un clon del
+repo ya compila con físicas. Con <code>-DUSE_JOLT=OFF</code> se usa el
+fallback en <code>libmod_3d_physics.c</code>.</li>
+<li><strong>cgltf.h</strong>, <strong>ufbx.c/.h</strong>,
+<strong>stb</strong>‑style headers: incluidos en el módulo.</li>
+</ul>
+<h3 id="32-build-completo-recomendado">3.2 Build completo
+(recomendado)</h3>
+<p>Desde la raíz del repo BennuGD2, el script <code>build.sh</code>
+configura CMake y compila todo (compilador <code>bgdc</code>, intérprete
+<code>bgdi</code>, y todos los módulos incluido este):</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> /home/ruben/BennuGD2</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./build.sh</span> linux            <span class="co"># target linux-gnu -&gt; salida en build/linux-gnu/bin/</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co"># opciones útiles:  debug   clean   verbose   one-job   static</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># otros targets:    windows  windows32  linux32  macosx  switch  android</span></span></code></pre></div>
+<p>Resultado en <code>build/linux-gnu/bin/</code>: <code>bgdc</code>,
+<code>bgdi</code>, <code>libmod_3d.so</code> y el resto de módulos.</p>
+<h3 id="33-recompilar-solo-el-módulo-3d-iteración-rápida">3.3 Recompilar
+SOLO el módulo 3D (iteración rápida)</h3>
+<p>Cuando ya existe el directorio de build y solo tocas C del motor:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> /home/ruben/BennuGD2/build/linux-gnu</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> mod_3d                 <span class="co"># reconstruye y enlaza libmod_3d.so en ../../bin/</span></span></code></pre></div>
+<blockquote>
+<p>El <em>target</em> de CMake se llama
+<strong><code>mod_3d</code></strong> (no <code>libmod_3d</code>). El
+<code>.so</code> se deja en <code>build/linux-gnu/bin/</code>, que es
+donde <code>bgdi</code> busca los módulos.</p>
+</blockquote>
+<h3 id="34-compilar-y-ejecutar-un-prg">3.4 Compilar y ejecutar un
+<code>.PRG</code></h3>
+<div class="sourceCode" id="cb3"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> /home/ruben/BennuGD2/modules/libmod_3d/TEST</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">bgdc</span> TEST_TR.PRG            <span class="co"># compila  -&gt; TEST_TR.dcb</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="ex">bgdi</span> TEST_TR.dcb           <span class="co"># ejecuta</span></span></code></pre></div>
+<p>Un <code>.PRG</code> mínimo importa el módulo así:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>import <span class="st">&quot;libmod_gfx&quot;</span><span class="op">;</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>import <span class="st">&quot;libmod_misc&quot;</span><span class="op">;</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>import <span class="st">&quot;libmod_input&quot;</span><span class="op">;</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>import <span class="st">&quot;libmod_3d&quot;</span><span class="op">;</span></span></code></pre></div>
+<h3 id="35-notas-de-plataforma-del-cmakeliststxt">3.5 Notas de
+plataforma (del <code>CMakeLists.txt</code>)</h3>
+<ul>
+<li><code>-D__LIBMOD_3D</code> define el módulo; en VITA se añade
+<code>-DVITA</code> y se excluye Jolt.</li>
+<li>Jolt se compila como estático con <strong>PIC</strong> (posición
+independiente) porque se enlaza dentro del <code>.so</code>; se
+desactivan sus tests/samples/viewer.</li>
+<li><code>mod_3d</code> se compila como <strong>C++17</strong> cuando
+Jolt está activo (por el <code>.cpp</code>).</li>
+</ul>
+<hr />
+<h2 id="4-mapa-de-ficheros-del-código-fuente">4. Mapa de ficheros del
+código fuente</h2>
+<p>Todos los <code>.c</code> listados están en el
+<code>CMakeLists.txt</code> (39 fuentes propias, más <code>ufbx.c</code>
+y, opcionalmente, <code>libmod_3d_jolt.cpp</code>). Cada <code>.c</code>
+tiene su <code>.h</code> salvo donde se indica.</p>
+<h3 id="41-núcleo-e-infraestructura">4.1 Núcleo e infraestructura</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Fichero</th>
+<th>Contenido</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="libmod_3d.c"><code>libmod_3d.c</code></a> /
+<code>.h</code></td>
+<td><strong>Corazón del módulo.</strong> Estado global
+<code>g_3d_engine</code>, ganchos
+<code>module_initialize/finalize</code>, y <strong>la mayoría de
+wrappers <code>*_bgd</code></strong> que convierten los parámetros de
+BennuGD2 a las llamadas C. Aquí vive <code>g3d_model_spawn</code>
+(instancia un modelo entero con materiales PBR automáticos). Define
+tipos
+<code>G3D_Material/Texture/Mesh/Model/Entity/Light/Camera/Scene/Engine</code>.</td>
+</tr>
+<tr class="even">
+<td><a href="libmod_3d_exports.h"><code>libmod_3d_exports.h</code></a></td>
+<td>Tabla de exportación a BennuGD2 (constantes, locals y
+<code>FUNC(...)</code>). Es el <strong>índice de toda la API
+pública</strong>.</td>
+</tr>
+<tr class="odd">
+<td><a href="libmod_3d_math.c"><code>libmod_3d_math.c</code></a> /
+<code>.h</code></td>
+<td>Matemáticas 3D sin dependencias: <code>Vec2/3/4</code>,
+<code>Quat</code>, <code>Mat4</code> (4x4 <em>column‑major</em>),
+transformaciones, proyecciones, look‑at. Base de todo lo demás.</td>
+</tr>
+<tr class="even">
+<td><a href="libmod_3d_shader.c"><code>libmod_3d_shader.c</code></a> /
+<code>.h</code></td>
+<td>Compilación/enlazado de shaders GLSL y gestión de <em>uniforms</em>.
+Variantes PC (GL 3.3+) y GLES2. Contiene el código GLSL del
+PBR/sombras/post.</td>
+</tr>
+<tr class="odd">
+<td><a href="libmod_3d_texture.c"><code>libmod_3d_texture.c</code></a> /
+<code>.h</code></td>
+<td>Carga de imágenes (PNG/JPG/TGA… vía SDL2_image), subida a GPU y
+caché de texturas. Exporta <code>G3D_LOAD_TEXTURE</code>.</td>
+</tr>
+<tr class="even">
+<td><a href="libmod_3d_mesh.c"><code>libmod_3d_mesh.c</code></a> /
+<code>.h</code></td>
+<td>Estructuras de malla y <em>buffers</em> GPU (VAO/VBO/EBO). Cálculo
+de AABB (<code>g3d_mesh_calculate_bounds</code>,
+<code>g3d_model_calculate_bounds</code>), submallas, subida de
+vértices.</td>
+</tr>
+<tr class="odd">
+<td><a href="libmod_3d_renderer.c"><code>libmod_3d_renderer.c</code></a>
+/ <code>.h</code></td>
+<td><strong>Pipeline forward.</strong> Orquesta: frustum culling → paso
+de sombras (depth) → paso forward con iluminación PBR → post (fog, HDR,
+bloom, SSAO, SMAA, FSR). Contiene casi toda la configuración de render
+(<code>g3d_set_*</code>). Fichero más grande junto a
+<code>libmod_3d.c</code>.</td>
+</tr>
+<tr class="even">
+<td><a href="libmod_3d_camera.c"><code>libmod_3d_camera.c</code></a> /
+<code>.h</code></td>
+<td>Cámaras: matrices vista/proyección, FPS/3ª persona/ortográfica, FOV,
+look‑at.</td>
+</tr>
+<tr class="odd">
+<td><a href="libmod_3d_scene.c"><code>libmod_3d_scene.c</code></a> /
+<code>.h</code></td>
+<td>Gestión de escenas: colecciones de entidades, luces y cámaras.</td>
+</tr>
+<tr class="even">
+<td><a href="libmod_3d_entity.c"><code>libmod_3d_entity.c</code></a> /
+<code>.h</code></td>
+<td>Entidades (objetos con transform + malla + material).
+<code>g3d_model_spawn</code> y helpers de instanciación de
+submallas.</td>
+</tr>
+<tr class="odd">
+<td><a href="libmod_3d_material.c"><code>libmod_3d_material.c</code></a>
+/ <code>.h</code></td>
+<td>Materiales: color base, metallic, roughness, texturas y mapas PBR
+(normal/metal/rough).</td>
+</tr>
+<tr class="even">
+<td><a href="libmod_3d_light.c"><code>libmod_3d_light.c</code></a> /
+<code>.h</code></td>
+<td>Luces direccional/punto/foco, con sombras y calidad de sombra.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="42-cargadores-de-modelos">4.2 Cargadores de modelos</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Fichero</th>
+<th>Contenido</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="libmod_3d_gltf.c"><code>libmod_3d_gltf.c</code></a> /
+<code>.h</code></td>
+<td>Cargador <strong>glTF 2.0</strong>
+(<code>.gltf</code>/<code>.glb</code>) vía cgltf. Convierte a
+<code>G3DModel</code> con mallas, materiales PBR, esqueleto y
+animaciones. Opciones de <em>recenter</em> y <em>chunking</em> espacial.
+Camino más robusto para personajes.</td>
+</tr>
+<tr class="even">
+<td><a href="libmod_3d_obj.c"><code>libmod_3d_obj.c</code></a> /
+<code>.h</code></td>
+<td>Cargador <strong>Wavefront .obj</strong> (mallas estáticas +
+texturas base‑color desde <code>.mtl</code>).</td>
+</tr>
+<tr class="odd">
+<td><a href="libmod_3d_fbx.c"><code>libmod_3d_fbx.c</code></a> /
+<code>.h</code></td>
+<td>Cargador <strong>FBX</strong> vía <code>ufbx</code> (estático +
+<em>skinned</em> + animaciones, estilo Mixamo). Búsqueda tolerante de
+texturas por nombre/ruta (incluye <em>fallback</em> por nombre de
+material cuando el FBX no trae enlaces).</td>
+</tr>
+<tr class="even">
+<td><code>ufbx.c</code> / <code>ufbx.h</code></td>
+<td>Librería <em>single‑file</em> de parseo FBX (terceros).</td>
+</tr>
+<tr class="odd">
+<td><a href="libmod_3d_trlevel.c"><code>libmod_3d_trlevel.c</code></a> /
+<code>.h</code></td>
+<td><strong>Cargador nativo de niveles Tomb Raider</strong>
+(<code>.PHD</code>/<code>.TR2</code>/<code>.tr4</code>/<code>.TRC</code>,
+TR1–TR5). Lee rooms, geometría y texturas del propio nivel; detecta
+versión por <em>magic</em>/extensión. <code>G3D_LOAD_TR</code>,
+<code>G3D_TR_PROBE</code>.</td>
+</tr>
+<tr class="even">
+<td><a href="libmod_3d_anim.c"><code>libmod_3d_anim.c</code></a> /
+<code>.h</code></td>
+<td>Reproducción de <strong>animación esqueletal</strong> (glTF/FBX),
+<em>skinning</em> en CPU. Muestreo de poses, <em>blending</em>, bloqueo
+de raíz (<code>lock_root</code>).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="43-físicas-y-colisión">4.3 Físicas y colisión</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Fichero</th>
+<th>Contenido</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="libmod_3d_collide.c"><code>libmod_3d_collide.c</code></a> /
+<code>.h</code></td>
+<td>Colisión <strong>sencilla</strong> contra AABB de entidades marcadas
+como sólidas: <em>move‑and‑slide</em> de un cilindro vertical y
+<em>raycast</em> rayo‑vs‑cajas. Suficiente para muros/props y
+<em>picking</em>.</td>
+</tr>
+<tr class="even">
+<td><a href="libmod_3d_physics.c"><code>libmod_3d_physics.c</code></a> /
+<code>.h</code></td>
+<td>Capa física <strong>cinemática ligera</strong> propia: <em>character
+controllers</em> de cápsula (andar/saltar sobre el heightmap o
+superficie vóxel, deslizar en pendientes, subir escalones) y cajas AABB.
+También contiene la implementación <em>fallback</em> de <em>rigid
+bodies</em> (cuando <code>USE_JOLT</code> está apagado).</td>
+</tr>
+<tr class="odd">
+<td><a href="libmod_3d_jolt.cpp"><code>libmod_3d_jolt.cpp</code></a></td>
+<td>Backend <strong>Jolt Physics</strong> (opcional, por defecto ON).
+Implementa la misma API <code>g3d_rigidbody_*</code>/colisión de malla
+que <code>physics.c</code>, alimentando el heightmap del terreno como
+<em>HeightFieldShape</em>. Los <code>.PRG</code> no cambian según el
+backend.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="44-entorno-cielo-y-agua">4.4 Entorno, cielo y agua</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Fichero</th>
+<th>Contenido</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="libmod_3d_sky.c"><code>libmod_3d_sky.c</code></a> /
+<code>.h</code></td>
+<td>Cielo: gradiente vertical procedural (cénit→horizonte con
+<em>glow</em> de sol) o panorama equirectangular. Nubes y nubes
+bajas.</td>
+</tr>
+<tr class="even">
+<td><a href="libmod_3d_ibl.c"><code>libmod_3d_ibl.c</code></a> /
+<code>.h</code></td>
+<td><strong>Image Based Lighting real</strong> generado desde el cielo
+que se está renderizando: cubemap de entorno → irradiancia (difuso) +
+cadena prefiltrada (especular por <em>roughness</em>) + BRDF LUT.
+Captura perezosa (solo al cambiar el cielo).</td>
+</tr>
+<tr class="odd">
+<td><a href="libmod_3d_water.c"><code>libmod_3d_water.c</code></a> /
+<code>.h</code></td>
+<td><strong>Superficie de agua animada</strong>: plano con shader propio
+(olas por suma de senos, normales analíticas, Fresnel, especular de sol,
+transparencia, reflexión planar/SSR, océano, ripples/splashes).</td>
+</tr>
+<tr class="even">
+<td><a href="libmod_3d_flow.c"><code>libmod_3d_flow.c</code></a> /
+<code>.h</code></td>
+<td><strong>Agua en movimiento</strong> (cascadas/ríos): cintas cuya
+textura hace <em>scroll</em> a lo largo; verticales = cascada,
+inclinadas = río.</td>
+</tr>
+<tr class="odd">
+<td><a href="libmod_3d_watersim.c"><code>libmod_3d_watersim.c</code></a>
+/ <code>.h</code></td>
+<td><strong>Simulación de agua unificada</strong> (campo de altura
+<em>shallow‑water</em>, Mei et al.): el agua es un campo de PROFUNDIDAD
+por celda sobre el terreno; fluye cuesta abajo, y
+lagos/ríos/cascadas/deltas emergen de una sola superficie. Autoría =
+fuentes + gravedad.</td>
+</tr>
+<tr class="even">
+<td><a href="libmod_3d_fluidfill.c"><code>libmod_3d_fluidfill.c</code></a></td>
+<td><strong>Inundación de depresiones</strong> (<em>flood‑fill</em>):
+dado un terreno y una semilla, halla el nivel de desbordamiento y genera
+una malla plana de lago que se ajusta a la cuenca. (Sin
+<code>.h</code>.)</td>
+</tr>
+<tr class="odd">
+<td><a href="libmod_3d_fire.c"><code>libmod_3d_fire.c</code></a> /
+<code>.h</code></td>
+<td><strong>Fuego procedural</strong> (antorchas/hogueras):
+<em>billboard</em> con shader de llama por ruido (HDR para que haga
+<em>bloom</em>) + luz de punto cálida y parpadeante.</td>
+</tr>
+<tr class="even">
+<td><a href="libmod_3d_particles.c"><code>libmod_3d_particles.c</code></a> /
+<code>.h</code></td>
+<td><strong>Partículas GPU</strong> (<em>point sprites</em>): spray de
+cascada, salpicaduras, niebla, fuentes. Emisor con pool de partículas
+actualizado en CPU.</td>
+</tr>
+<tr class="odd">
+<td><a href="libmod_3d_mirror.c"><code>libmod_3d_mirror.c</code></a> /
+<code>.h</code></td>
+<td><strong>Espejos planos</strong> (varios, cada uno con su reflexión):
+renderiza la escena reflejada en la textura del espejo; sin asset de
+textura.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="45-postproceso-y-culling">4.5 Post‑proceso y culling</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Fichero</th>
+<th>Contenido</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="libmod_3d_occlusion.c"><code>libmod_3d_occlusion.c</code></a> /
+<code>.h</code></td>
+<td><strong>Occlusion culling por hardware</strong> (<em>GL occlusion
+queries</em>): tras el paso opaco, prueba la AABB de cada entidad contra
+el <em>depth</em>; si ninguna muestra pasa, se descarta el fotograma
+siguiente. Visibilidad con 1 frame de retardo (sin
+<em>stalls</em>).</td>
+</tr>
+<tr class="even">
+<td><a href="libmod_3d_smaa.c"><code>libmod_3d_smaa.c</code></a> /
+<code>.h</code></td>
+<td><strong>SMAA 1x</strong> (antialias, Jimenez et al.): 3 pasos sobre
+la imagen LDR (detección de bordes → pesos de mezcla con LUTs →
+<em>blending</em>). Prerrequisito de FSR. Fuentes vendored en
+<code>smaa/</code> y <code>smaa_shader.h</code>.</td>
+</tr>
+<tr class="odd">
+<td><a href="libmod_3d_fsr.c"><code>libmod_3d_fsr.c</code></a> /
+<code>.h</code></td>
+<td><strong>AMD FSR 1</strong> (reescalado espacial): EASU (upsample
+adaptativo a bordes) + RCAS (sharpen). Renderiza a menor resolución y
+escala a la de pantalla. Fuentes en <code>fsr/</code> y
+<code>fsr_shader.h</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="46-terreno-y-herramientas-de-mundo">4.6 Terreno y herramientas
+de mundo</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Fichero</th>
+<th>Contenido</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="libmod_3d_primitives.c"><code>libmod_3d_primitives.c</code></a> /
+<code>.h</code></td>
+<td>Generación de <strong>primitivas</strong>: cubo, esfera, plano,
+terreno (heightmap), acantilados, montañas.</td>
+</tr>
+<tr class="even">
+<td><a href="libmod_3d_terrain.c"><code>libmod_3d_terrain.c</code></a> /
+<code>.h</code></td>
+<td><strong>Edición de terreno en runtime</strong> (para el editor):
+pinceles de subir/bajar, suavizar, aplanar; recalcula normales y re‑sube
+la malla.</td>
+</tr>
+<tr class="odd">
+<td><a href="libmod_3d_paint.c"><code>libmod_3d_paint.c</code></a> /
+<code>.h</code></td>
+<td><strong>Pintura de texturas sobre terreno</strong>: un lienzo RGBA
+0..1 estirado sobre el terreno; se rellena con una base y se pintan
+otras texturas con pincel, horneando un único albedo.</td>
+</tr>
+<tr class="even">
+<td><a href="libmod_3d_chunkterrain.c"><code>libmod_3d_chunkterrain.c</code></a>
+/ <code>.h</code></td>
+<td><strong>Terreno por chunks</strong> (mundos kilométricos): un único
+array de alturas compartido, renderizado como rejilla de mallas para
+<em>frustum‑cull</em> por chunk; bordes sin costuras (geometría y luz).
+El estado lo posee el llamante (editor).</td>
+</tr>
+<tr class="odd">
+<td><a href="libmod_3d_cave.c"><code>libmod_3d_cave.c</code></a> /
+<code>.h</code></td>
+<td><strong>Cuevas por vóxeles</strong> (híbrido con heightmap):
+volúmenes de densidad subterráneos esculpidos con pincel esférico 3D,
+mallados con <em>marching cubes</em> (ver tablas en
+<code>libmod_3d_mctables.h</code>).</td>
+</tr>
+<tr class="even">
+<td><a href="libmod_3d_voxterrain.c"><code>libmod_3d_voxterrain.c</code></a> /
+<code>.h</code></td>
+<td><strong>Terreno vóxel completo</strong> (marching cubes): todo el
+terreno es un campo de densidad 3D por chunks; soporta
+cuevas/salientes/arcos y un pincel único de cavar/añadir. Superficie
+derivada para agua/colisión.</td>
+</tr>
+<tr class="odd">
+<td><a href="libmod_3d_worldgen.c"><code>libmod_3d_worldgen.c</code></a>
+/ <code>.h</code></td>
+<td><strong>Terreno procedural</strong> para mundos
+<em>streameados</em>: función de altura determinista (fBm <em>value
+noise</em>); mismas coords → mismo terreno, tiles adyacentes casan en
+las costuras. Biomas y texturas por altura.</td>
+</tr>
+<tr class="even">
+<td><a href="libmod_3d_pick.c"><code>libmod_3d_pick.c</code></a> /
+<code>.h</code></td>
+<td><strong>Picking pantalla→mundo</strong>: desproyecta un píxel y
+marcha el rayo contra el <em>heightfield</em>, dando el punto bajo el
+cursor (colocar cosas con el ratón).</td>
+</tr>
+<tr class="odd">
+<td><a href="libmod_3d_prefab.c"><code>libmod_3d_prefab.c</code></a> /
+<code>.h</code></td>
+<td><strong>Prefabs</strong>: grupos nombrados de piezas (cajas) con
+transform/color/textura/collider; se guardan/cargan en texto y se
+instancian en la escena con posición + yaw.</td>
+</tr>
+<tr class="even">
+<td><a href="libmod_3d_scenefile.c"><code>libmod_3d_scenefile.c</code></a> /
+<code>.h</code></td>
+<td><strong>Ficheros <code>.scene</code></strong> (mapa declarativo en
+texto): terreno, cielo, niebla, luces, vegetación esparcida, modelos y
+prefabs. El editor externo escribe, el runtime carga con una llamada.
+Incluye punto de aparición del jugador.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="47-mundos-grandes-instancing-y-streaming">4.7 Mundos grandes:
+instancing y streaming</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Fichero</th>
+<th>Contenido</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="libmod_3d_instance.c"><code>libmod_3d_instance.c</code></a>
+/ <code>.h</code></td>
+<td><strong>Instancing GPU</strong> para vegetación/props: una malla
+dibujada muchas veces en una <em>draw call</em>, con transform por
+instancia, <em>culling</em> por distancia+frustum, LOD barato y <em>wind
+sway</em> opcional. También <em>scatter</em> (esparcir) y skinning en
+GPU.</td>
+</tr>
+<tr class="even">
+<td><a href="libmod_3d_stream.c"><code>libmod_3d_stream.c</code></a> /
+<code>.h</code></td>
+<td><strong>Streaming por tiles</strong> (open world): divide el mundo
+en rejilla; cada <code>update</code> reporta tiles que ENTRAN (poblar) y
+SALEN (liberar) del radio de carga. El juego decide qué vive en cada
+tile (sin callbacks C→script). Síncrono en esta versión.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="48-recursos-vendored">4.8 Recursos vendored</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Ruta</th>
+<th>Contenido</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>jolt/</code></td>
+<td>Jolt Physics (fuente completa, MIT).</td>
+</tr>
+<tr class="even">
+<td><code>smaa/</code>, <code>smaa_shader.h</code></td>
+<td>Shaders/LUTs oficiales de SMAA.</td>
+</tr>
+<tr class="odd">
+<td><code>fsr/</code>, <code>fsr_shader.h</code></td>
+<td>Shaders de AMD FidelityFX Super Resolution 1.</td>
+</tr>
+<tr class="even">
+<td><code>cgltf.h</code></td>
+<td>Parser glTF <em>single‑file</em>.</td>
+</tr>
+<tr class="odd">
+<td><code>ufbx.c/.h</code></td>
+<td>Parser FBX <em>single‑file</em>.</td>
+</tr>
+<tr class="even">
+<td><code>libmod_3d_mctables.h</code></td>
+<td>Tablas de <em>marching cubes</em> (cuevas/vóxel).</td>
+</tr>
+<tr class="odd">
+<td><code>libmod_3d_cloud_glsl.h</code></td>
+<td>GLSL de nubes para el cielo.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="49-cloth-simulación-de-tela">4.9 Cloth (simulación de tela)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Fichero</th>
+<th>Contenido</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="libmod_3d_cloth.c"><code>libmod_3d_cloth.c</code></a> /
+<code>.h</code></td>
+<td><strong>Tela por Verlet</strong> (banderas, telas colgantes):
+rejilla de partículas con restricciones de distancia; se ancla un borde,
+se sopla viento y una esfera (el personaje) la empuja. El resultado es
+una <code>G3DMesh</code> normal (texturizada/iluminada/sombreada).</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="5-estructuras-de-datos-principales">5. Estructuras de datos
+principales</h2>
+<p>Definidas en <a href="libmod_3d.h"><code>libmod_3d.h</code></a>.
+Resumen de las más relevantes:</p>
+<ul>
+<li><strong><code>G3D_Material</code></strong> — albedo, especular,
+shininess, <em>metallic</em>, <em>roughness</em>, alpha; IDs de texturas
+(albedo/normal/rough/metal, −1 si no hay); <code>blend_mode</code> (0
+opaco, 1 alpha, 2 aditivo); <code>cull_face</code> (0 back, 1 front, 2
+none).</li>
+<li><strong><code>G3D_Texture</code></strong> — dimensiones, canales,
+datos crudos y <em>handle</em> GPU.</li>
+<li><strong><code>G3D_Mesh</code></strong> —
+posiciones/normales/texcoords/índices, <code>material_id</code>,
+VAO/VBO/EBO.</li>
+<li><strong><code>G3D_Model</code></strong> — array de mallas +
+animaciones + AABB.</li>
+<li><strong><code>G3D_Transform</code></strong> — posición, rotación
+(cuaternión), escala, <em>euler</em> cacheado,
+<code>model_matrix</code>, <code>parent_id</code>.</li>
+<li><strong><code>G3D_Entity</code></strong> — transform +
+<code>model_id</code> + <code>material_override</code> + estado de
+animación + <code>physics_body_id</code> + visibilidad/sombra.</li>
+<li><strong><code>G3D_Light</code></strong> — tipo, color, intensidad,
+posición/dirección, rango, cono, <em>shadow map</em> y matriz de espacio
+de luz.</li>
+<li><strong><code>G3D_Camera</code></strong> — posición/target/up,
+<em>euler</em>, proyección (persp/orto), FOV, planos near/far, matrices
+vista/proyección.</li>
+<li><strong><code>G3D_Scene</code></strong> — arrays de
+entidades/luces/cámaras/cuerpos, luz ambiente, niebla, color de
+fondo.</li>
+<li><strong><code>G3D_Engine</code></strong> — estado global:
+dimensiones, escena activa, pools de modelos/texturas/materiales,
+contexto GPU, flags de debug, delta time.</li>
+</ul>
+<p>Procesos <code>C_3D</code> en BennuGD2: las locales inyectadas
+(<code>CSUBTYPE</code>, <code>COORDX/Y/Z</code>,
+<code>ANGLE_X/Y/Z</code>, <code>SIZE*</code>, <code>ENTITY</code>)
+permiten manejar entidades/luces/cámaras como procesos con
+<code>CSUBTYPE</code> = <code>C3D_ENTITY/LIGHT/CAMERA</code>.</p>
+<hr />
+<h2 id="6-referencia-de-la-api-por-subsistemas">6. Referencia de la API
+por subsistemas</h2>
+<blockquote>
+<p>Formato: <strong><code>NOMBRE_BGD</code></strong>
+<code>(firma)</code> → retorno — descripción. Recuerda la leyenda de
+firmas de la <a href="#cómo-leer-las-firmas-importante-para-este-documento">§2</a>.</p>
+<p><strong>Orden de parámetros verificado</strong> contra las firmas C
+reales y los <em>wrappers</em> <code>*_bgd</code> (segunda pasada).
+Donde una función recibe varios <code>float</code>/<code>int</code>, se
+listan sus parámetros en el orden exacto en que hay que pasarlos.</p>
+</blockquote>
+<h3 id="61-escena">6.1 Escena</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_SCENE_CREATE</code></td>
+<td><code>S</code>→I</td>
+<td>Crea una escena con nombre; devuelve su id.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_SCENE_DESTROY</code></td>
+<td><code>I</code>→I</td>
+<td>Destruye la escena.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_SCENE_SET_ACTIVE</code></td>
+<td><code>I</code>→I</td>
+<td>Fija la escena activa (la que se renderiza).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="62-entidades">6.2 Entidades</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_ENTITY_SPAWN</code></td>
+<td><code>IIFFF</code>→I</td>
+<td>Crea una entidad en <code>(scene, model, x, y, z)</code>; devuelve
+id.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_ENTITY_DESTROY</code></td>
+<td><code>I</code>→I</td>
+<td>Destruye una entidad.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_MODEL_DESPAWN</code></td>
+<td><code>I</code>→I</td>
+<td>Elimina un modelo instanciado con <code>G3D_MODEL_SPAWN</code> (raíz
++ submallas).</td>
+</tr>
+<tr class="even">
+<td><code>G3D_ENTITY_SET_POSITION</code></td>
+<td><code>IFFF</code>→I</td>
+<td>Posición mundial de la entidad.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_ENTITY_SET_ROTATION</code></td>
+<td><code>IFFF</code>→I</td>
+<td>Rotación <code>(pitch, yaw, roll)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_ENTITY_SET_SCALE</code></td>
+<td><code>IFFF</code>→I</td>
+<td>Escala <code>(sx, sy, sz)</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_ENTITY_GET_POSITION</code></td>
+<td><code>IPPP</code>→I</td>
+<td>Lee la posición en 3 variables por referencia.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_ENTITY_SET_PARENT</code></td>
+<td><code>II</code>→I</td>
+<td>Emparenta la entidad a otra (jerarquía de transforms).</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_ENTITY_SET_MESH</code></td>
+<td><code>II</code>→I</td>
+<td>Asigna una malla concreta a la entidad.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_ENTITY_SET_MATERIAL</code></td>
+<td><code>II</code>→I</td>
+<td>Asigna un material (override) a la entidad.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_ENTITY_SET_ALPHA</code></td>
+<td><code>II</code>→I</td>
+<td>Transparencia global de la entidad.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_ENTITY_SET_COLOR</code></td>
+<td><code>IIII</code>→I</td>
+<td>Tinte de color (RGBA como enteros).</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_ENTITY_SET_BLEND</code></td>
+<td><code>II</code>→I</td>
+<td>Modo de mezcla (opaco/alpha/aditivo).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="63-cámaras">6.3 Cámaras</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_CAMERA_CREATE</code></td>
+<td>(—)→I</td>
+<td>Crea una cámara; devuelve id.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_CAMERA_SET_ACTIVE</code></td>
+<td><code>I</code>→I</td>
+<td>Cámara activa.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_CAMERA_SET_POSITION</code></td>
+<td><code>IFFF</code>→I</td>
+<td>Posición de la cámara.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_CAMERA_LOOK_AT</code></td>
+<td><code>IFFFFFF</code>→I</td>
+<td>Mira a <code>(tx,ty,tz)</code> con <em>up</em>
+<code>(ux,uy,uz)</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_CAMERA_SET_PROJECTION</code></td>
+<td><code>II</code>→I</td>
+<td>Proyección: 0 perspectiva, 1 ortográfica.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_CAMERA_SET_FOV</code></td>
+<td><code>IF</code>→I</td>
+<td>Campo de visión vertical (grados).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="64-carga-y-consulta-de-modelos">6.4 Carga y consulta de
+modelos</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_LOAD_GLTF</code></td>
+<td><code>S</code>→I</td>
+<td>Carga <code>.gltf</code>/<code>.glb</code>
+(malla+PBR+esqueleto+animaciones). Camino recomendado para
+personajes.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_LOAD_OBJ</code></td>
+<td><code>S</code>→I</td>
+<td>Carga Wavefront <code>.obj</code> (estático).</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_LOAD_FBX</code></td>
+<td><code>S</code>→I</td>
+<td>Carga FBX (estático/skinned/animado, vía ufbx).</td>
+</tr>
+<tr class="even">
+<td><code>G3D_LOAD_MD3</code></td>
+<td><code>S</code>→I</td>
+<td>Carga modelos MD3 (Quake III).</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_LOAD_TR</code></td>
+<td><code>S</code>→I</td>
+<td>Carga un nivel nativo de Tomb Raider (TR1–TR5); devuelve el modelo
+del nivel.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_TR_PROBE</code></td>
+<td><code>S</code>→I</td>
+<td>Detecta la versión TR del fichero (1–5) sin cargarlo del todo.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_LOAD_GLTF_FRACTURED</code></td>
+<td><code>S</code>→I</td>
+<td>Carga un glTF pensado para fractura/destrucción.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_GLTF_SET_RECENTER</code></td>
+<td><code>I</code>→I</td>
+<td>Activa/desactiva recentrado del modelo glTF al origen.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_GLTF_SET_CHUNKING</code></td>
+<td><code>F</code>→I</td>
+<td>Tamaño de <em>chunk</em> espacial para partir mallas grandes de
+glTF.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_MODEL_MESH</code></td>
+<td><code>I</code>→I</td>
+<td>Devuelve la malla principal del modelo.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_MODEL_TEXTURE</code></td>
+<td><code>I</code>→I</td>
+<td>Devuelve la textura principal del modelo.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_MODEL_SUBMESH_COUNT</code></td>
+<td><code>I</code>→I</td>
+<td>Nº de submallas del modelo (p.ej. rooms de un nivel TR).</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_MODEL_SUBMESH</code></td>
+<td><code>II</code>→I</td>
+<td>Devuelve la submalla <code>i</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_MODEL_SUBMESH_TEXTURE</code></td>
+<td><code>II</code>→I</td>
+<td>Textura de la submalla <code>i</code> (−1 si no hay).</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_MODEL_SUBMESH_MAP</code></td>
+<td><code>III</code>→I</td>
+<td>Mapa PBR de la submalla <code>i</code> por tipo (1 normal, 2
+metallic, 3 roughness).</td>
+</tr>
+<tr class="even">
+<td><code>G3D_MODEL_SUBMESH_LOD</code></td>
+<td><code>III</code>→I</td>
+<td>Fija/consulta el LOD de una submalla.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_MODEL_SUBMESH_CX/CY/CZ</code></td>
+<td><code>II</code>→F</td>
+<td>Centro (x/y/z) de la AABB de la submalla <code>i</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_MODEL_SUBMESH_HX/HY/HZ</code></td>
+<td><code>II</code>→F</td>
+<td>Semiejes (x/y/z) de la AABB de la submalla <code>i</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_MODEL_HEIGHT</code></td>
+<td><code>I</code>→F</td>
+<td>Altura del modelo (extensión en Y del bind‑pose).</td>
+</tr>
+<tr class="even">
+<td><code>G3D_MODEL_SIZE</code></td>
+<td><code>I</code>→F</td>
+<td>Tamaño (diagonal/extensión) del modelo.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_MODEL_ORIENT</code></td>
+<td><code>IFFF</code>→I</td>
+<td>Reorienta el modelo (corrige ejes al importar).</td>
+</tr>
+<tr class="even">
+<td><code>G3D_MODEL_SPAWN</code></td>
+<td><code>IIFFFFF</code>→I</td>
+<td><strong>Instancia un modelo entero</strong> en
+<code>(scene, model, x, y, z, height, roty)</code>: crea una raíz + una
+entidad por submalla con materiales PBR automáticos.
+<code>height&gt;0</code> escala a esa altura; <code>roty</code> en
+grados. Devuelve la entidad raíz.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_MODEL_SET_GPU_SKIN</code></td>
+<td><code>II</code>→I</td>
+<td>Activa <em>skinning</em> en GPU para el modelo.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_LOAD_TEXTURE</code></td>
+<td><code>S</code>→I</td>
+<td>Carga una textura suelta desde fichero; devuelve id.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="65-animación-esqueletal">6.5 Animación esqueletal</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_MODEL_ANIM_COUNT</code></td>
+<td><code>I</code>→I</td>
+<td>Nº de animaciones del modelo.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_MODEL_ANIM_DURATION</code></td>
+<td><code>II</code>→F</td>
+<td>Duración (s) de la animación <code>a</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_MODEL_ANIMATE</code></td>
+<td><code>IIFI</code>→I</td>
+<td>Reproduce la animación <code>a</code> en tiempo <code>t</code>
+(<code>loop</code> 0/1).</td>
+</tr>
+<tr class="even">
+<td><code>G3D_MODEL_ANIMATE_BLEND</code></td>
+<td><code>IIFIFFI</code>→I</td>
+<td>Mezcla dos animaciones:
+<code>(model, a0, t0, a1, t1, peso, loop)</code> con <code>peso</code>
+0..1.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_MODEL_ANIMATE_ALL</code></td>
+<td><code>IFI</code>→I</td>
+<td>Aplica una animación global a todo
+(<code>model, t, loop</code>).</td>
+</tr>
+<tr class="even">
+<td><code>G3D_MODEL_REST_POSE</code></td>
+<td><code>I</code>→I</td>
+<td>Pone el modelo en su pose de reposo (bind).</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_MODEL_LOCK_ROOT</code></td>
+<td><code>II</code>→I</td>
+<td>Bloquea la traslación del hueso raíz (anima &quot;en el sitio&quot;; la física
+mueve al personaje).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="66-materiales">6.6 Materiales</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_MATERIAL_CREATE</code></td>
+<td>(—)→I</td>
+<td>Crea un material; devuelve id.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_MATERIAL_SET_COLOR</code></td>
+<td><code>IFFFF</code>→I</td>
+<td>Color base RGBA.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_MATERIAL_SET_METALLIC</code></td>
+<td><code>IF</code>→I</td>
+<td>Factor metálico 0..1.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_MATERIAL_SET_ROUGHNESS</code></td>
+<td><code>IF</code>→I</td>
+<td>Rugosidad 0..1.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_MATERIAL_SET_TEXTURE</code></td>
+<td><code>III</code>→I</td>
+<td>Asigna textura a un <em>slot</em>
+<code>(material, slot, texture)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_MATERIAL_SET_MAP</code></td>
+<td><code>III</code>→I</td>
+<td>Asigna mapa PBR <code>(material, tipo, texture)</code> — 1 normal, 2
+metallic, 3 roughness.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="67-luces">6.7 Luces</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_LIGHT_CREATE</code></td>
+<td><code>IFFF</code>→I</td>
+<td>Crea luz <code>(tipo, r, g, b)</code>; tipo 0 direccional, 1 punto,
+2 foco.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_LIGHT_SET_POSITION</code></td>
+<td><code>IFFF</code>→I</td>
+<td>Posición (punto/foco).</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_LIGHT_SET_DIRECTION</code></td>
+<td><code>IFFF</code>→I</td>
+<td>Dirección (direccional/foco).</td>
+</tr>
+<tr class="even">
+<td><code>G3D_LIGHT_SET_INTENSITY</code></td>
+<td><code>IF</code>→I</td>
+<td>Intensidad.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_LIGHT_SET_COLOR</code></td>
+<td><code>IFFF</code>→I</td>
+<td>Color RGB.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_LIGHT_SET_RANGE</code></td>
+<td><code>IF</code>→I</td>
+<td>Rango (punto/foco).</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_LIGHT_SET_CONE</code></td>
+<td><code>IF</code>→I</td>
+<td>Ángulo del cono (foco).</td>
+</tr>
+<tr class="even">
+<td><code>G3D_LIGHT_ENABLE_SHADOW</code></td>
+<td><code>II</code>→I</td>
+<td>Activa sombras para esa luz.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_LIGHT_SET_SHADOW_QUALITY</code></td>
+<td><code>II</code>→I</td>
+<td>Resolución del shadow map (1024/2048/4096).</td>
+</tr>
+<tr class="even">
+<td><code>G3D_SET_SUN</code></td>
+<td><code>F</code>→I</td>
+<td>Ajusta el sol (elevación/parámetro global de luz solar).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="68-entorno-y-configuración-de-render">6.8 Entorno y
+configuración de render</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_SET_CLEAR_COLOR</code></td>
+<td><code>FFFF</code>→I</td>
+<td>Color de borrado del fondo.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_SET_AMBIENT_LIGHT</code></td>
+<td><code>FFFF</code>→I</td>
+<td>Luz ambiente <code>(r,g,b,intensidad)</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_SET_FOG</code></td>
+<td><code>IFFFFF</code>→I</td>
+<td>Niebla <code>(on, r, g, b, inicio, fin)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_SET_WIREFRAME_MODE</code></td>
+<td><code>I</code>→I</td>
+<td>Modo alambre on/off.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_SET_SHADOWS</code></td>
+<td><code>I</code>→I</td>
+<td>Sombras globales on/off.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_SET_HDR</code></td>
+<td><code>I</code>→I</td>
+<td>Render HDR on/off.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_SET_TONEMAP</code></td>
+<td><code>I</code>→I</td>
+<td>Tonemapping on/off.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_SET_EXPOSURE</code></td>
+<td><code>F</code>→I</td>
+<td>Exposición HDR.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_SET_BLOOM</code></td>
+<td><code>IFF</code>→I</td>
+<td>Bloom <code>(on, umbral, intensidad)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_SET_SSAO</code></td>
+<td><code>IFF</code>→I</td>
+<td>Oclusión ambiental en pantalla
+<code>(on, radio, intensidad)</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_SET_IBL</code></td>
+<td><code>IF</code>→I</td>
+<td>Image Based Lighting <code>(on, intensidad)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_IBL_REFRESH</code></td>
+<td>(—)→I</td>
+<td>Fuerza recomputar el IBL desde el cielo actual.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_SET_OCCLUSION</code></td>
+<td><code>I</code>→I</td>
+<td>Occlusion culling por hardware on/off.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_SET_SMAA</code></td>
+<td><code>I</code>→I</td>
+<td>Antialias SMAA on/off.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_SET_FSR</code></td>
+<td><code>IFF</code>→I</td>
+<td>FSR 1 <code>(on, escala_de_render, nitidez)</code> — reescalado
+espacial (escala &lt; 1 = renderiza a menos y sube).</td>
+</tr>
+<tr class="even">
+<td><code>G3D_SET_FSR_HEIGHT</code></td>
+<td><code>IIF</code>→I</td>
+<td>Configura FSR por altura de render.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_SET_LOD</code></td>
+<td><code>F</code>→I</td>
+<td>Distancia base de LOD.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_SET_CULLING</code></td>
+<td><code>I</code>→I</td>
+<td>Frustum culling on/off.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_SET_BACKFACE_CULL</code></td>
+<td><code>I</code>→I</td>
+<td>Descarte de caras traseras on/off.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_SET_UNDERWATER</code></td>
+<td><code>IFFFF</code>→I</td>
+<td>Efecto submarino <code>(on, r, g, b, densidad)</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_RENDER_WIDTH</code></td>
+<td>(—)→I</td>
+<td>Ancho del render actual.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_RENDER_HEIGHT</code></td>
+<td>(—)→I</td>
+<td>Alto del render actual.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="69-cielo">6.9 Cielo</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_SKY_SET_GRADIENT</code></td>
+<td><code>FFFFFF</code>→I</td>
+<td>Gradiente <code>(cénit rgb, horizonte rgb)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_SKY_SET_CLOUDS</code></td>
+<td><code>FF</code>→I</td>
+<td>Nubes <code>(cobertura, velocidad)</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_SKY_SET_LOW_CLOUDS</code></td>
+<td><code>FFFF</code>→I</td>
+<td>Nubes bajas <code>(cobertura, altura, tamaño, sombra)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_SKY_SET_TEXTURE</code></td>
+<td><code>I</code>→I</td>
+<td>Usa una textura panorámica como cielo.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_SKY_ENABLE</code></td>
+<td><code>I</code>→I</td>
+<td>Activa/desactiva el cielo.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="610-agua-superficie-y-océano">6.10 Agua (superficie y
+océano)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_WATER_CREATE</code></td>
+<td><code>FFI</code>→I</td>
+<td>Crea una superficie de agua
+<code>(nivel, tamaño, resolución)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_WATER_SET_WAVES</code></td>
+<td><code>FFF</code>→I</td>
+<td>Parámetros de olas
+<code>(amplitud, frecuencia, velocidad)</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_WATER_SET_COLOR</code></td>
+<td><code>FFFFFF</code>→I</td>
+<td>Color del agua (poco/mucho fondo).</td>
+</tr>
+<tr class="even">
+<td><code>G3D_WATER_SET_ENABLED</code></td>
+<td><code>I</code>→I</td>
+<td>Activa/desactiva el agua.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_WATER_SET_TEXTURE</code></td>
+<td><code>I</code>→I</td>
+<td>Textura del agua.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_WATER_SET_REFLECTION</code></td>
+<td><code>IF</code>→I</td>
+<td>Reflexión planar <code>(on, intensidad)</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_WATER_SET_REFLECTION_FLIP</code></td>
+<td><code>I</code>→I</td>
+<td>Invierte la reflexión.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_WATER_SET_SSR</code></td>
+<td><code>IF</code>→I</td>
+<td>Reflexiones en espacio de pantalla
+<code>(on, intensidad)</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_WATER_SET_OCEAN</code></td>
+<td><code>FFF</code>→I</td>
+<td>Modo océano <code>(dir_x, dir_z, amplitud_marejada)</code> —
+marejada + rompiente (0 = off).</td>
+</tr>
+<tr class="even">
+<td><code>G3D_WATER_SET_TESSELLATION</code></td>
+<td><code>I</code>→I</td>
+<td>Teselación de la malla de agua.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_WATER_RIPPLE</code></td>
+<td><code>FFF</code>→I</td>
+<td>Genera una onda en <code>(x, z, fuerza)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_WATER_SPLASH</code></td>
+<td><code>FFFF</code>→I</td>
+<td>Salpicadura <code>(x, y, z, fuerza)</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="611-ríos-y-cascadas-flow">6.11 Ríos y cascadas (flow)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_FLOW_ADD</code></td>
+<td><code>FFFFFFFFF</code>→I</td>
+<td>Cinta de agua
+<code>(top x,y,z, bottom x,y,z, ancho, velocidad, tiling)</code> —
+vertical = cascada, inclinada = río.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_FLOW_ADD_RIVER</code></td>
+<td><code>IFFFFFFFF</code>→I</td>
+<td>Río sobre terreno
+<code>(terrain_mesh, x0, z0, x1, z1, ancho, desfase_y, velocidad, tiling)</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_FLOW_SET_TEXTURE</code></td>
+<td><code>I</code>→I</td>
+<td>Textura del flujo.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_FLOW_SET_COLOR</code></td>
+<td><code>FFF</code>→I</td>
+<td>Color del flujo.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_FLOW_SET_CLIP</code></td>
+<td><code>F</code>→I</td>
+<td>Plano de recorte.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_FLOW_CLEAR</code></td>
+<td>(—)→I</td>
+<td>Borra todos los flujos.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="612-fuego-y-partículas">6.12 Fuego y partículas</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_FIRE_ADD</code></td>
+<td><code>FFFF</code>→I</td>
+<td>Añade una llama en <code>(x, y, z, tamaño)</code> con luz
+cálida.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_FIRE_CLEAR</code></td>
+<td>(—)→I</td>
+<td>Borra todos los fuegos.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_PARTICLES_CREATE</code></td>
+<td><code>FFFFFFFFFFFFFI</code>→I</td>
+<td>Emisor:
+<code>(x, y, z, ext_x, ext_y, ext_z, vel_x, vel_y, vel_z, dispersión, gravedad, tamaño, vida, nº)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_PARTICLES_SET_COLOR</code></td>
+<td><code>IFFF</code>→I</td>
+<td>Color de las partículas.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_PARTICLES_SET_FLOOR</code></td>
+<td><code>IF</code>→I</td>
+<td>Altura del suelo (rebote/parada).</td>
+</tr>
+<tr class="even">
+<td><code>G3D_PARTICLES_CLEAR</code></td>
+<td>(—)→I</td>
+<td>Borra todos los emisores.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="613-espejos">6.13 Espejos</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_MIRROR_CREATE</code></td>
+<td><code>FFFFFFFF</code>→I</td>
+<td>Espejo plano
+<code>(px, py, pz, normal_x, normal_y, normal_z, ancho, alto)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_MIRROR_SET_FLIP</code></td>
+<td><code>II</code>→I</td>
+<td>Invierte la reflexión del espejo.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_MIRROR_SET_TINT</code></td>
+<td><code>IFFF</code>→I</td>
+<td>Tinte del espejo.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_MIRROR_SET_DISTANCE</code></td>
+<td><code>F</code>→I</td>
+<td>Distancia máxima de reflexión.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_MIRROR_CLEAR</code></td>
+<td>(—)→I</td>
+<td>Borra los espejos.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="614-colisión-simple-y-raycast-libmod_3d_collidec">6.14 Colisión
+simple y raycast (<code>libmod_3d_collide.c</code>)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_ENTITY_SET_COLLIDER</code></td>
+<td><code>II</code>→I</td>
+<td>Marca la entidad como sólida (aporta su AABB a la colisión).</td>
+</tr>
+<tr class="even">
+<td><code>G3D_COLLIDE_MOVE</code></td>
+<td><code>FFFFFFF</code>→I</td>
+<td>Mueve un cilindro con <em>collide‑and‑slide</em> contra las cajas;
+resultado en <code>G3D_COLLIDE_X/Z</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_COLLIDE_X</code></td>
+<td>(—)→F</td>
+<td>X resultante del último <code>COLLIDE_MOVE</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_COLLIDE_Z</code></td>
+<td>(—)→F</td>
+<td>Z resultante del último <code>COLLIDE_MOVE</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_COLLIDE_FLOOR</code></td>
+<td><code>FFFF</code>→F</td>
+<td>Altura del suelo bajo un punto (vs cajas).</td>
+</tr>
+<tr class="even">
+<td><code>G3D_RAYCAST</code></td>
+<td><code>FFFFFFPPP</code>→I</td>
+<td>Lanza un rayo <code>(origen, dir, ...)</code>; hit por referencia y
+<code>G3D_RAY_*</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_RAY_HIT_X/Y/Z</code></td>
+<td>(—)→F</td>
+<td>Punto de impacto del último raycast.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_RAY_ENTITY</code></td>
+<td>(—)→I</td>
+<td>Entidad impactada por el último raycast.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="615-character-controller-y-física-cinemática-libmod_3d_physicsc--jolt">6.15
+Character controller y física cinemática
+(<code>libmod_3d_physics.c</code> / Jolt)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_CHAR_CREATE</code></td>
+<td><code>FFFFF</code>→I</td>
+<td>Crea un <em>character controller</em> de cápsula
+<code>(x, y, z, radio, altura)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_CHAR_DESTROY</code></td>
+<td><code>I</code>→I</td>
+<td>Destruye el controller.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_CHAR_MOVE</code></td>
+<td><code>IFF</code>→I</td>
+<td>Fija la intención de movimiento horizontal
+<code>(vx, vz)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_CHAR_JUMP</code></td>
+<td><code>IF</code>→I</td>
+<td>Salta con impulso dado.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_CHAR_UPDATE</code></td>
+<td><code>IF</code>→I</td>
+<td>Integra la física <code>dt</code> (gravedad, deslizamiento,
+escalones).</td>
+</tr>
+<tr class="even">
+<td><code>G3D_CHAR_SET_POSITION</code></td>
+<td><code>IFFF</code>→I</td>
+<td>Teletransporta el controller.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_CHAR_SET_TUNING</code></td>
+<td><code>IFF</code>→I</td>
+<td>Ajuste
+<code>(altura de escalón, pendiente máx en grados)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_CHAR_X/Y/Z</code></td>
+<td><code>I</code>→F</td>
+<td>Posición actual del controller.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_CHAR_GROUNDED</code></td>
+<td><code>I</code>→I</td>
+<td>1 si está en el suelo.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_PHYSICS_SET_GRAVITY</code></td>
+<td><code>F</code>→I</td>
+<td>Gravedad global.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_COLLIDER_ADD_BOX</code></td>
+<td><code>FFFFFF</code>→I</td>
+<td>Añade una caja AABB estática <code>(min, max)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_COLLIDER_ADD_MESH</code></td>
+<td><code>IIFFFF</code>→I</td>
+<td>Añade una submalla como colisión de malla estática
+<code>(model, submesh, x, y, z, escala)</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_COLLIDER_CLEAR</code></td>
+<td>(—)→I</td>
+<td>Borra todos los colliders.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="616-rigid-bodies-jolt">6.16 Rigid bodies (Jolt)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_RIGIDBODY_CREATE</code></td>
+<td><code>FFFFFFF</code>→I</td>
+<td>Crea un cuerpo rígido tipo caja
+<code>(pos, semiejes, masa)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_RIGIDBODY_CREATE_SPHERE</code></td>
+<td><code>FFFFF</code>→I</td>
+<td>Cuerpo esfera <code>(pos, radio, masa)</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_RIGIDBODY_CREATE_CAPSULE</code></td>
+<td><code>FFFFFF</code>→I</td>
+<td>Cuerpo cápsula.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_RIGIDBODY_CREATE_CYLINDER</code></td>
+<td><code>FFFFFF</code>→I</td>
+<td>Cuerpo cilindro.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_RIGIDBODY_CREATE_CONVEX</code></td>
+<td><code>FFFIIFF</code>→I</td>
+<td>Cuerpo convexo desde geometría.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_RIGIDBODY_SET_CCD</code></td>
+<td><code>II</code>→I</td>
+<td>Activa <em>continuous collision detection</em>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_RIGIDBODY_DESTROY</code></td>
+<td><code>I</code>→I</td>
+<td>Destruye el cuerpo.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_RIGIDBODY_CLEAR</code></td>
+<td>(—)→I</td>
+<td>Borra todos los cuerpos.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_RIGIDBODY_STEP</code></td>
+<td><code>F</code>→I</td>
+<td>Avanza la simulación <code>dt</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_RIGIDBODY_APPLY_IMPULSE</code></td>
+<td><code>IFFF</code>→I</td>
+<td>Aplica un impulso.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_RIGIDBODY_SET_VELOCITY</code></td>
+<td><code>IFFF</code>→I</td>
+<td>Fija la velocidad lineal.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_RIGIDBODY_SET_ANGULAR_VELOCITY</code></td>
+<td><code>IFFF</code>→I</td>
+<td>Fija la velocidad angular.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_RIGIDBODY_SET_BOUNCE</code></td>
+<td><code>IFF</code>→I</td>
+<td>Rebote/fricción.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_RIGIDBODY_X/Y/Z</code></td>
+<td><code>I</code>→F</td>
+<td>Posición del cuerpo.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_RIGIDBODY_ANGLE_X/Y/Z</code></td>
+<td><code>I</code>→F</td>
+<td>Ángulos del cuerpo.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_RIGIDBODY_RENDER_X/Y/Z</code></td>
+<td><code>I</code>→F</td>
+<td>Posición interpolada para render.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_RIGIDBODY_GROUNDED</code></td>
+<td><code>I</code>→I</td>
+<td>1 si está apoyado.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_RIGIDBODY_SET_MODEL_OFFSET</code></td>
+<td><code>IFFF</code>→I</td>
+<td>Desfase visual del modelo respecto al cuerpo.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_PHYSICS_BODY_CREATE</code></td>
+<td><code>IIFF</code>→I</td>
+<td>(API antigua) crea cuerpo asociado a entidad
+<code>(entity, shape, masa, radio)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_PHYSICS_BODY_SET_VELOCITY</code></td>
+<td><code>IFFF</code>→I</td>
+<td>(API antigua) velocidad del cuerpo.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_PHYSICS_STEP</code></td>
+<td><code>F</code>→I</td>
+<td>(API antigua) paso de simulación.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="617-vehículos">6.17 Vehículos</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_VEHICLE_CREATE</code></td>
+<td><code>FFFF</code>→I</td>
+<td>Crea un vehículo <code>(x, y, z, rumbo)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_VEHICLE_DESTROY</code></td>
+<td><code>I</code>→I</td>
+<td>Destruye el vehículo.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_VEHICLE_UPDATE</code></td>
+<td><code>IFFFF</code>→I</td>
+<td>Actualiza <code>(vehículo, dt, acelerador, giro, freno)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_VEHICLE_SET_GEOMETRY</code></td>
+<td><code>IFFF</code>→I</td>
+<td>Dimensiones del chasis.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_VEHICLE_SET_TUNING</code></td>
+<td><code>IFFFFF</code>→I</td>
+<td>Ajuste
+<code>(vehículo, motor, vel_máx, giro_máx_grados, freno, resistencia)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_VEHICLE_X/Y/Z</code></td>
+<td><code>I</code>→F</td>
+<td>Posición del vehículo.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_VEHICLE_YAW/PITCH/ROLL</code></td>
+<td><code>I</code>→F</td>
+<td>Orientación del vehículo.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_VEHICLE_SPEED</code></td>
+<td><code>I</code>→F</td>
+<td>Velocidad actual.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="618-instancing-y-scatter-libmod_3d_instancec">6.18 Instancing y
+<em>scatter</em> (<code>libmod_3d_instance.c</code>)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_INSTANCES_CREATE</code></td>
+<td><code>II</code>→I</td>
+<td>Crea un grupo de instancias <code>(scene, model)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_INSTANCES_CREATE_SKINNED</code></td>
+<td><code>III</code>→I</td>
+<td>Grupo de instancias con animación (skinned).</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_INSTANCES_ADD</code></td>
+<td><code>IFFFFF</code>→I</td>
+<td>Añade una instancia <code>(pos, rot, escala…)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_INSTANCES_SET</code></td>
+<td><code>IIFFFFF</code>→I</td>
+<td>Modifica la instancia <code>i</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_INSTANCES_SET_WIND</code></td>
+<td><code>IF</code>→I</td>
+<td>Balanceo por viento del grupo.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_INSTANCES_SET_ALPHA_CUT</code></td>
+<td><code>II</code>→I</td>
+<td><em>Alpha cutoff</em> (follaje).</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_INSTANCES_SET_DISTANCE</code></td>
+<td><code>IF</code>→I</td>
+<td>Distancia de culling/LOD del grupo.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_INSTANCES_CLEAR</code></td>
+<td><code>I</code>→I</td>
+<td>Vacía el grupo.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_INSTANCES_COUNT</code></td>
+<td><code>I</code>→I</td>
+<td>Nº de instancias.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_SCATTER_MODEL</code></td>
+<td><code>IIIFFFFI</code>→I</td>
+<td>Esparce un modelo
+<code>(model, terrain, nº, área, altura_objetivo, var_escala, viento, semilla)</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_SCATTER_MESH</code></td>
+<td><code>IIIIFFFFI</code>→I</td>
+<td>Esparce una malla
+<code>(mesh, textura, terrain, nº, área, escala_mín, escala_máx, viento, semilla)</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="619-mundos-grandes-rebase-y-streaming">6.19 Mundos grandes:
+rebase y streaming</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_WORLD_REBASE</code></td>
+<td><code>FFF</code>→I</td>
+<td>Reancla el origen del mundo (precisión en mundos enormes).</td>
+</tr>
+<tr class="even">
+<td><code>G3D_STREAM_INIT</code></td>
+<td><code>FI</code>→I</td>
+<td>Inicializa el streaming <code>(tamaño de tile, radio)</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_STREAM_UPDATE</code></td>
+<td><code>FF</code>→I</td>
+<td>Actualiza con la posición de cámara <code>(x, z)</code>; calcula
+tiles que entran/salen.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_STREAM_LOAD_COUNT</code></td>
+<td>(—)→I</td>
+<td>Nº de tiles que acaban de entrar (a poblar).</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_STREAM_LOAD_X/Z</code></td>
+<td><code>I</code>→I</td>
+<td>Coord del i‑ésimo tile a cargar.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_STREAM_UNLOAD_COUNT</code></td>
+<td>(—)→I</td>
+<td>Nº de tiles que salieron (a liberar).</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_STREAM_UNLOAD_X/Z</code></td>
+<td><code>I</code>→I</td>
+<td>Coord del i‑ésimo tile a descargar.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_STREAM_LOADED_COUNT</code></td>
+<td>(—)→I</td>
+<td>Nº de tiles cargados actualmente.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="620-generación-procedural-de-terreno-libmod_3d_worldgenc">6.20
+Generación procedural de terreno
+(<code>libmod_3d_worldgen.c</code>)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_WORLDGEN_SET</code></td>
+<td><code>IFFF</code>→I</td>
+<td>Configura el generador
+<code>(semilla, amplitud, frecuencia, nivel_del_mar)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_WORLDGEN_HEIGHT</code></td>
+<td><code>FF</code>→F</td>
+<td>Altura procedural en <code>(x, z)</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_WORLDGEN_TILE</code></td>
+<td><code>IIIFIFFI</code>→I</td>
+<td>Malla de un tile
+<code>(scene, tile_x, tile_z, tamaño, resolución, origen_x, origen_z, textura)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_WORLDGEN_TILE_FREE</code></td>
+<td><code>I</code>→I</td>
+<td>Libera una malla de tile.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_WORLDGEN_SET_WATER_DEPTH</code></td>
+<td><code>F</code>→I</td>
+<td>Cuánto se hunde el fondo del océano (1 = def, &gt;1 = más
+profundo).</td>
+</tr>
+<tr class="even">
+<td><code>G3D_WORLDGEN_SET_BIOME_TEXTURES</code></td>
+<td><code>IIIIF</code>→I</td>
+<td>Texturas por bioma
+<code>(arena, hierba, roca, nieve, escala)</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="621-escenas-scene-y-consultas-de-mundo-libmod_3d_scenefilec">6.21
+Escenas <code>.scene</code> y consultas de mundo
+(<code>libmod_3d_scenefile.c</code>)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_SCENE_LOAD</code></td>
+<td><code>S</code>→I</td>
+<td>Carga un mapa declarativo <code>.scene</code> (terreno, cielo,
+luces, vegetación, modelos, prefabs).</td>
+</tr>
+<tr class="even">
+<td><code>G3D_SCENE_TERRAIN_HEIGHT</code></td>
+<td><code>FF</code>→F</td>
+<td>Altura del terreno de la escena en <code>(x, z)</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_SCENE_WATER_LEVEL</code></td>
+<td>(—)→F</td>
+<td>Nivel del agua de la escena.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_SCENE_HAS_SPAWN</code></td>
+<td>(—)→I</td>
+<td>1 si la escena define punto de aparición.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_SCENE_SPAWN_X/Y/Z</code></td>
+<td>(—)→F</td>
+<td>Punto de aparición del jugador.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_SCENE_PLAYER_RADIUS</code></td>
+<td>(—)→F</td>
+<td>Radio sugerido del jugador.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_SCENE_PLAYER_HEIGHT</code></td>
+<td>(—)→F</td>
+<td>Altura sugerida del jugador.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_SCENE_PLAYER_CLIMB</code></td>
+<td>(—)→F</td>
+<td>Altura de escalón sugerida.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="622-terreno-vóxel-libmod_3d_voxterrainc">6.22 Terreno vóxel
+(<code>libmod_3d_voxterrain.c</code>)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_VOXTERRAIN_FLOOR</code></td>
+<td><code>FFF</code>→F</td>
+<td>Altura de la superficie vóxel bajo <code>(x, y, z)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_VOXTERRAIN_SOLID</code></td>
+<td><code>FFF</code>→I</td>
+<td>1 si la celda <code>(x,y,z)</code> es sólida.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_VOXTERRAIN_BLOCKED</code></td>
+<td><code>FFFFF</code>→I</td>
+<td>1 si un movimiento choca con vóxel sólido.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_VOXTERRAIN_WORLDSIZE</code></td>
+<td>(—)→F</td>
+<td>Tamaño del mundo vóxel.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_VOXTERRAIN_WALK</code></td>
+<td><code>FFFFFFFF</code>→I</td>
+<td><em>Move‑and‑slide</em> contra la superficie vóxel; resultado en
+<code>WALKX/Y/Z</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_VOXTERRAIN_WALKX/Y/Z</code></td>
+<td>(—)→F</td>
+<td>Posición resultante del último <code>WALK</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="623-picking-libmod_3d_pickc">6.23 Picking
+(<code>libmod_3d_pick.c</code>)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_PICK_TERRAIN</code></td>
+<td><code>IFFFFI</code>→I</td>
+<td>Rayo pantalla→terreno
+<code>(cámara, píxel_x, píxel_y, ancho, alto, terrain)</code>; hit en
+<code>PICK_X/Y/Z</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_PICK_X/Y/Z</code></td>
+<td>(—)→F</td>
+<td>Punto del terreno bajo el cursor.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="624-primitivas-y-edición-de-terreno-libmod_3d_primitivesc--terrainc">6.24
+Primitivas y edición de terreno (<code>libmod_3d_primitives.c</code> /
+<code>terrain.c</code>)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_PRIMITIVE_CUBE</code></td>
+<td>(—)→I</td>
+<td>Crea una malla de cubo.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_PRIMITIVE_SPHERE</code></td>
+<td><code>I</code>→I</td>
+<td>Crea una esfera (subdivisiones).</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_PRIMITIVE_PLANE</code></td>
+<td>(—)→I</td>
+<td>Crea un plano.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_PRIMITIVE_TERRAIN</code></td>
+<td><code>IFFFI</code>→I</td>
+<td>Terreno heightmap
+<code>(grid, tamaño_mundo, altura, tiling, semilla)</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_PRIMITIVE_CLIFFS</code></td>
+<td><code>IFFFIFF</code>→I</td>
+<td>Acantilados
+<code>(grid, tamaño_mundo, altura, tiling, semilla, pendiente, suelo_agua)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_PRIMITIVE_MOUNTAIN</code></td>
+<td><code>IFFFIF</code>→I</td>
+<td>Montaña
+<code>(grid, tamaño_mundo, pico, tiling, semilla, canal)</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_TERRAIN_GET_HEIGHT</code></td>
+<td><code>IFF</code>→F</td>
+<td>Altura del terreno en <code>(x, z)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_TERRAIN_RAISE</code></td>
+<td><code>IFFFF</code>→I</td>
+<td>Pincel subir/bajar <code>(mesh, wx, wz, radio, fuerza)</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_TERRAIN_SMOOTH</code></td>
+<td><code>IFFFF</code>→I</td>
+<td>Pincel suavizar <code>(mesh, wx, wz, radio, cantidad)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_TERRAIN_FLATTEN</code></td>
+<td><code>IFFFFF</code>→I</td>
+<td>Pincel aplanar
+<code>(mesh, wx, wz, radio, altura_objetivo, cantidad)</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="625-pintura-de-terreno-libmod_3d_paintc">6.25 Pintura de terreno
+(<code>libmod_3d_paint.c</code>)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_PAINT_CREATE</code></td>
+<td><code>II</code>→I</td>
+<td>Crea un lienzo de pintura para un terreno.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_PAINT_FILL</code></td>
+<td><code>IIF</code>→I</td>
+<td>Rellena con una textura base.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_TERRAIN_PAINT</code></td>
+<td><code>IIIFFFFF</code>→I</td>
+<td>Pinta
+<code>(terrain, lienzo, textura, tiling_textura, wx, wz, radio, opacidad)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_PAINT_GET_TEXTURE</code></td>
+<td><code>I</code>→I</td>
+<td>Textura horneada resultante.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_PAINT_SAVE</code></td>
+<td><code>IS</code>→I</td>
+<td>Guarda el lienzo a fichero.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="626-prefabs-libmod_3d_prefabc">6.26 Prefabs
+(<code>libmod_3d_prefab.c</code>)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_PREFAB_CREATE</code></td>
+<td><code>S</code>→I</td>
+<td>Crea un prefab con nombre.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_PREFAB_ADD_BOX</code></td>
+<td><code>IFFFFFFFFFFFFI</code>→I</td>
+<td>Pieza caja
+<code>(prefab, px,py,pz, sx,sy,sz, rx,ry,rz, r,g,b, collider)</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_PREFAB_PIECE_TEXTURE</code></td>
+<td><code>IS</code>→I</td>
+<td>Textura de la última pieza.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_PREFAB_SAVE</code></td>
+<td><code>IS</code>→I</td>
+<td>Guarda el prefab a fichero de texto.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_PREFAB_LOAD</code></td>
+<td><code>S</code>→I</td>
+<td>Carga un prefab de fichero.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_PREFAB_INSTANTIATE</code></td>
+<td><code>IIFFFF</code>→I</td>
+<td>Instancia el prefab en <code>(scene, x, y, z, yaw)</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_PREFAB_COUNT</code></td>
+<td><code>I</code>→I</td>
+<td>Nº de piezas del prefab.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="627-tela-libmod_3d_clothc">6.27 Tela
+(<code>libmod_3d_cloth.c</code>)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_CLOTH_CREATE</code></td>
+<td><code>FFIIFFF</code>→I</td>
+<td>Crea una tela <code>(ancho, alto, nx, ny, px, py, pz)</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_CLOTH_PIN</code></td>
+<td><code>II</code>→I</td>
+<td>Ancla un punto de la rejilla.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_CLOTH_SET_WIND</code></td>
+<td><code>IFFFF</code>→I</td>
+<td>Viento sobre la tela.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_CLOTH_SET_COLLIDER</code></td>
+<td><code>IFFFF</code>→I</td>
+<td>Esfera que empuja la tela <code>(x, y, z, radio)</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_CLOTH_CLEAR_COLLIDER</code></td>
+<td><code>I</code>→I</td>
+<td>Quita el collider.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_CLOTH_SET_TEXTURE</code></td>
+<td><code>II</code>→I</td>
+<td>Textura de la tela.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_CLOTH_UPDATE</code></td>
+<td><code>IF</code>→I</td>
+<td>Integra la simulación <code>dt</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="628-ratón-captura-relativa">6.28 Ratón (captura relativa)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Función</th>
+<th>Firma</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>G3D_MOUSE_CAPTURE</code></td>
+<td><code>I</code>→I</td>
+<td>Captura/libera el ratón (modo relativo para mirar).</td>
+</tr>
+<tr class="even">
+<td><code>G3D_MOUSE_UPDATE</code></td>
+<td>(—)→I</td>
+<td>Lee el delta del ratón este frame.</td>
+</tr>
+<tr class="odd">
+<td><code>G3D_MOUSE_DX</code></td>
+<td>(—)→I</td>
+<td>Delta X desde el último <code>UPDATE</code>.</td>
+</tr>
+<tr class="even">
+<td><code>G3D_MOUSE_DY</code></td>
+<td>(—)→I</td>
+<td>Delta Y desde el último <code>UPDATE</code>.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="apéndice-a--ejemplos-en-test">Apéndice A — Ejemplos en
+<code>TEST/</code></h2>
+<p>Hay ~45 demos <code>.PRG</code> en <a href="TEST/"><code>TEST/</code></a> que ejercitan cada subsistema.
+Algunas de referencia:</p>
+<ul>
+<li><strong><code>TEST_TR.PRG</code></strong> — nivel nativo de Tomb
+Raider + Lara jugable (FBX animado, colisión por rooms, 3ª
+persona).</li>
+<li><strong><code>TEST_CHARACTER.PRG</code></strong> — personaje jugable
+3ª persona con blending idle/walk/run (glTF).</li>
+<li><strong><code>TEST_WALK.PRG</code></strong> — character controller
+1ª persona sobre terreno con colisión de cajas.</li>
+<li><strong><code>TEST_ANIM.PRG</code></strong> — reproductor de
+animaciones esqueletales (LEFT/RIGHT cambian).</li>
+<li><strong><code>TEST_WATER.PRG</code> /
+<code>TEST_WATERFALL.PRG</code></strong> — agua, olas, cascadas.</li>
+<li><strong><code>TEST_PHYSICS.PRG</code> /
+<code>TEST_FRACTURE.PRG</code> / <code>TEST_DRIVE.PRG</code></strong> —
+Jolt: rigid bodies, destrucción, vehículos.</li>
+<li><strong><code>TEST_OPENWORLD.PRG</code> /
+<code>TEST_STREAM.PRG</code> /
+<code>TEST_GTA3_STREAM.PRG</code></strong> — mundos grandes (instancing
++ streaming).</li>
+<li><strong><code>TEST_IBL.PRG</code> / <code>TEST_SHADOW.PRG</code> /
+<code>TEST_FSR.PRG</code></strong> — iluminación, sombras,
+reescalado.</li>
+</ul>
+<p>Compila y ejecuta cualquiera con
+<code>bgdc X.PRG &amp;&amp; bgdi X.dcb</code> desde
+<code>TEST/</code>.</p>
+<hr />
+<h2 id="apéndice-b--resumen-de-cómo-compilar-chuleta">Apéndice B —
+Resumen de cómo compilar (chuleta)</h2>
+<div class="sourceCode" id="cb5"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 1) Build completo de BennuGD2 + módulo 3D (desde la raíz del repo)</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> /home/ruben/BennuGD2</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="ex">./build.sh</span> linux                 <span class="co"># salida: build/linux-gnu/bin/ (bgdc, bgdi, libmod_3d.so)</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="co"># 2) Recompilar SOLO el módulo tras tocar C del motor</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> /home/ruben/BennuGD2/build/linux-gnu</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> mod_3d                      <span class="co"># target CMake = mod_3d  -&gt;  ../../bin/libmod_3d.so</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="co"># 3) Compilar y ejecutar una demo</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> /home/ruben/BennuGD2/modules/libmod_3d/TEST</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="ex">bgdc</span> TEST_TR.PRG <span class="kw">&amp;&amp;</span> <span class="ex">bgdi</span> TEST_TR.dcb</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Físicas: Jolt va ON por defecto (vendored en jolt/). Para el fallback propio:</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="co">#   cmake ... -DUSE_JOLT=OFF</span></span></code></pre></div>
+</body>
+</html>

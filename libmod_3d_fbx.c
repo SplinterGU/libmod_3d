@@ -11,6 +11,7 @@
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
+#include <dirent.h>
 
 static Mat4 mat_from_ufbx(ufbx_matrix m) {
     Mat4 r;
@@ -22,6 +23,13 @@ static Mat4 mat_from_ufbx(ufbx_matrix m) {
 }
 static Vec3 v3f(ufbx_vec3 v) { return vec3_make((float)v.x, (float)v.y, (float)v.z); }
 static Quat q4f(ufbx_quat q) { Quat r; r.x=(float)q.x; r.y=(float)q.y; r.z=(float)q.z; r.w=(float)q.w; return r; }
+
+/* Recentrado del modelo al cargar (ON = comportamiento de siempre). Desactivalo
+   con g3d_fbx_set_recenter(0) para mallas con esqueleto cuya pose BIND no
+   representa la pose real: ahi el AABB de la bind desplaza el modelo respecto a
+   donde lo coloca el juego. */
+static int g_fbx_recenter = 1;
+void g3d_fbx_set_recenter(int on) { g_fbx_recenter = on ? 1 : 0; }
 
 static void dir_of(const char *path, char *out, size_t n) {
     strncpy(out, path, n - 1); out[n - 1] = 0;
@@ -74,6 +82,38 @@ static G3DTexture *fbx_find_texture(const char *dir, ufbx_texture *tex) {
     }
     return NULL;
 }
+/* Last-resort: some FBX exports drop ALL texture links (materials carry only a
+   name like "Head"/"Body"). Scan the asset folder (and its textures/ subdir) for
+   a file whose name contains the MATERIAL name and a keyword for this map kind. */
+static G3DTexture *fbx_find_by_matname(const char *dir, const char *matname, int kind) {
+    if (!matname || !matname[0]) return NULL;
+    /* keywords per kind, strongest first */
+    const char *kw[4];
+    if (kind == 0)      { kw[0]="basecolor"; kw[1]="albedo"; kw[2]="diffuse"; kw[3]="_d"; }
+    else if (kind == 1) { kw[0]="normal"; kw[1]="_n"; kw[2]="nrm"; kw[3]="bump"; }
+    else if (kind == 2) { kw[0]="metallic"; kw[1]="metalness"; kw[2]="metal"; kw[3]="_m"; }
+    else                { kw[0]="roughness"; kw[1]="rough"; kw[2]="gloss"; kw[3]="_r"; }
+    const char *subs[] = { "", "textures/", "Textures/", "tex/" };
+    char folder[600], path[900];
+    for (int s = 0; s < 4; s++) {
+        snprintf(folder, sizeof(folder), "%s%s", dir, subs[s]);
+        for (int k = 0; k < 4; k++) {                 /* strongest keyword wins */
+            DIR *dp = opendir(folder[0] ? folder : ".");
+            if (!dp) continue;
+            struct dirent *de;
+            while ((de = readdir(dp))) {
+                if (has_ci(de->d_name, matname) && has_ci(de->d_name, kw[k])) {
+                    snprintf(path, sizeof(path), "%s%s", folder, de->d_name);
+                    closedir(dp);
+                    return load_upload(path);
+                }
+            }
+            closedir(dp);
+        }
+    }
+    return NULL;
+}
+
 /* Pick a PBR map of a material by kind (0=base,1=normal,2=metallic,3=roughness):
    direct ufbx field, else scan the texture list by property/filename keyword. */
 static G3DTexture *fbx_map(const char *dir, ufbx_material *mat, int kind) {
@@ -93,7 +133,10 @@ static G3DTexture *fbx_map(const char *dir, ufbx_material *mat, int kind) {
         }
         if (kind == 0 && !tex && mat->textures.count) tex = mat->textures.data[0].texture;
     }
-    return fbx_find_texture(dir, tex);
+    G3DTexture *t = fbx_find_texture(dir, tex);
+    /* FBX with no texture links at all: match loose files by material name. */
+    if (!t && mat->name.length) t = fbx_find_by_matname(dir, mat->name.data, kind);
+    return t;
 }
 
 G3DModel *g3d_fbx_load(const char *filepath) {
@@ -264,8 +307,14 @@ G3DModel *g3d_fbx_load(const char *filepath) {
     if (scount == 0) { fprintf(stderr, "G3D: FBX has no geometry: %s\n", filepath); ufbx_free_scene(scene); free(meshes); free(textures); free(model); return NULL; }
 
     /* Recenter: rest the bottom on Y=0 and centre on X/Z (like the glTF loader), so
-       placing at terrain height sits the model ON the ground instead of half-buried. */
-    {
+       placing at terrain height sits the model ON the ground instead of half-buried.
+       CUIDADO con mallas SKINNED: esto mide la pose BIND, que en algunos FBX no es
+       la pose real (p.ej. lara_animada.fbx tiene la bind TUMBADA -> "centrarla en Z"
+       la desplazaba -4.25 uds del sitio donde la coloca el juego, con la capsula de
+       colision en un lado y el modelo dibujado en otro). En un modelo con esqueleto
+       la posicion la da el skinning, no el AABB de la bind: por eso
+       g3d_fbx_set_recenter(0) permite desactivarlo. */
+    if (g_fbx_recenter) {
         float mn[3] = { 1e30f, 1e30f, 1e30f }, mx[3] = { -1e30f, -1e30f, -1e30f };
         for (int s = 0; s < scount; s++)
             for (uint32_t v = 0; v < meshes[s].vertex_count; v++) {
@@ -273,16 +322,17 @@ G3DModel *g3d_fbx_load(const char *filepath) {
                 for (int c = 0; c < 3; c++) { if (p[c] < mn[c]) mn[c] = p[c]; if (p[c] > mx[c]) mx[c] = p[c]; }
             }
         float off[3] = { -(mn[0]+mx[0])*0.5f, -mn[1], -(mn[2]+mx[2])*0.5f };
-        for (int s = 0; s < scount; s++) {
+        for (int s = 0; s < scount; s++)
             for (uint32_t v = 0; v < meshes[s].vertex_count; v++) {
                 meshes[s].vertices[v].position[0] += off[0];
                 meshes[s].vertices[v].position[1] += off[1];
                 meshes[s].vertices[v].position[2] += off[2];
             }
-            g3d_mesh_calculate_bounds(&meshes[s]);
-            g3d_mesh_upload_gpu(&meshes[s]);
-        }
         if (any_skin) { model->skin_offset[0]=off[0]; model->skin_offset[1]=off[1]; model->skin_offset[2]=off[2]; }
+    }
+    for (int s = 0; s < scount; s++) {
+        g3d_mesh_calculate_bounds(&meshes[s]);
+        g3d_mesh_upload_gpu(&meshes[s]);
     }
     model->meshes = meshes; model->mesh_count = (uint32_t)scount;
     model->mesh_textures = textures; model->albedo_texture = textures[0];

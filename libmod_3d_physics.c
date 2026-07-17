@@ -10,6 +10,17 @@
 #define MAX_CHARS 32
 #define MAX_BOXES 512
 
+#ifdef USE_JOLT
+/* Level-mesh collision lives in the Jolt world (libmod_3d_jolt.cpp). The char
+   controller queries it so it collides with geometry added by
+   g3d_collider_add_mesh (e.g. Tomb Raider rooms), not just AABB boxes. When no
+   mesh collider exists (heightmap demos) these are no-ops and nothing changes. */
+extern int   g3d_jolt_mesh_count(void);
+extern float g3d_jolt_ground_below(float x, float z, float y_top, float y_min);
+extern int   g3d_jolt_slide_capsule(float *x, float *z, float feet,
+                                     float radius, float height, float step);
+#endif
+
 typedef struct {
     float px, py, pz;        /* feet position (bottom-centre of the capsule)   */
     float vx, vy, vz;        /* velocity                                       */
@@ -19,6 +30,9 @@ typedef struct {
     float slope_cos;         /* cos(max walkable slope); steeper -> slide       */
     int   grounded;
     int   active;
+    int   in_water;          /* 1 = swimming (buoyancy instead of gravity)      */
+    float water_y;           /* world Y of the water surface while in_water     */
+    float swim_up;           /* extra upward stroke this frame (from jump key)  */
 } G3DChar;
 
 typedef struct { float mn[3], mx[3]; int active; } G3DBox;
@@ -60,7 +74,17 @@ void g3d_char_move(int id, float vx, float vz) {
 void g3d_char_jump(int id, float speed) {
     if (id < 0 || id >= MAX_CHARS || !g_chars[id].active) return;
     G3DChar *c = &g_chars[id];
-    if (c->grounded) { c->vy = speed; c->grounded = 0; }
+    if (c->in_water) { c->swim_up = speed; }        /* swim stroke upward */
+    else if (c->grounded) { c->vy = speed; c->grounded = 0; }
+}
+
+/* Mark the character as in water (buoyancy + free vertical swim) or not, and give
+   the water surface Y. Call every frame from the game once it knows Lara is in a
+   pool (below a water surface, over its footprint). */
+void g3d_char_set_water(int id, int in_water, float surface_y) {
+    if (id < 0 || id >= MAX_CHARS || !g_chars[id].active) return;
+    g_chars[id].in_water = in_water ? 1 : 0;
+    g_chars[id].water_y = surface_y;
 }
 
 void g3d_char_set_position(int id, float x, float y, float z) {
@@ -305,6 +329,49 @@ void g3d_char_update(int id, float dt) {
     if (dt <= 0.0f) return;
     if (dt > 0.1f) dt = 0.1f;
 
+    /* ---- SWIMMING: buoyancy toward the surface + free horizontal control ------
+       Replaces gravity/ground while in water. WASD moves in the plane, ESPACIO
+       (swim_up) strokes up; otherwise she floats gently up to the surface so she
+       can reach the edge and climb out. Still collides with pool walls (Jolt) and
+       can't sink through the floor. */
+    if (c->in_water) {
+        c->vx = c->want_x; c->vz = c->want_z;         /* full horizontal control */
+
+        float head = c->py + c->height;
+        float target_vy;
+        if (c->swim_up > 0.0f) target_vy = c->swim_up;          /* active stroke up */
+        else if (head > c->water_y) target_vy = (c->water_y - head) * 4.0f; /* at surface: settle */
+        else target_vy = 3.0f;                                   /* submerged: float up gently */
+        c->vy += (target_vy - c->vy) * 6.0f * dt;                /* smooth */
+        c->swim_up = 0.0f;
+
+        float nxp = c->px + c->vx * dt;
+        float nzp = c->pz + c->vz * dt;
+#ifdef USE_JOLT
+        if (g3d_jolt_mesh_count() > 0)
+            g3d_jolt_slide_capsule(&nxp, &nzp, c->py, c->radius, c->height, c->step);
+#endif
+        for (int i = 0; i < MAX_BOXES; i++) {
+            float y0 = c->py, y1 = c->py + c->height;
+            if (g_boxes[i].active) resolve_xz(&g_boxes[i], &nxp, &nzp, c->radius, y0, y1);
+        }
+        c->px = nxp; c->pz = nzp;
+
+        /* vertical, but never below the pool floor */
+        float ny_new = c->py + c->vy * dt;
+        float ground = ground_under(c->px, c->pz, c->radius, c->py, c->step);
+#ifdef USE_JOLT
+        if (g3d_jolt_mesh_count() > 0) {
+            float gj = g3d_jolt_ground_below(c->px, c->pz, c->py + c->height, c->py - 4096.0f);
+            if (gj > -1.0e29f) ground = gj;
+        }
+#endif
+        if (ny_new < ground) { ny_new = ground; if (c->vy < 0.0f) c->vy = 0.0f; }
+        c->py = ny_new;
+        c->grounded = 0;
+        return;
+    }
+
     /* terrain normal at the current spot -> is this slope too steep to stand on? */
     float e = c->radius > 0.3f ? c->radius : 0.3f;
     float hL = g3d_scene_terrain_height(c->px - e, c->pz);
@@ -347,10 +414,26 @@ void g3d_char_update(int id, float dt) {
             c->vz = (nzp - c->pz) / dt;
         }
     }
+#ifdef USE_JOLT
+    /* slide against level mesh walls (Tomb Raider rooms, etc.) */
+    if (g3d_jolt_mesh_count() > 0 &&
+        g3d_jolt_slide_capsule(&nxp, &nzp, c->py, c->radius, c->height, c->step)) {
+        c->vx = (nxp - c->px) / dt;
+        c->vz = (nzp - c->pz) / dt;
+    }
+#endif
     c->px = nxp; c->pz = nzp;
 
     /* --- vertical integrate + ground/ceiling --- */
     float ground = ground_under(c->px, c->pz, c->radius, c->py, c->step);
+#ifdef USE_JOLT
+    /* level mesh floor (overrides the heightmap when a level is loaded): ray
+       straight down from the head finds the room floor under the character. */
+    if (g3d_jolt_mesh_count() > 0) {
+        float gj = g3d_jolt_ground_below(c->px, c->pz, c->py + c->height, c->py - 4096.0f);
+        if (gj > -1.0e29f) ground = gj;
+    }
+#endif
     float ny_new = c->py + c->vy * dt;
 
     if (c->vy <= 0.0f && ny_new <= ground) {                  /* landing / standing */

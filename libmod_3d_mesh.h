@@ -116,6 +116,7 @@ typedef struct {
     void **mesh_normal;      /* per-submesh normal / metallic / roughness maps (NULL if none) */
     void **mesh_metallic;
     void **mesh_roughness;
+    unsigned char *submesh_water;  /* per-submesh: 1 if this room is a TR water room (NULL if N/A) */
 
     /* ---- Skeletal animation (glTF) ---- */
     int skinned;                /* 1 if the model has a skin + skinned meshes */

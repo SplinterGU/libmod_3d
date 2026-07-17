@@ -80,7 +80,10 @@ int64_t g3d_camera_look_at_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_camera_set_projection_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_camera_set_fov_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_load_gltf_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_load_tr_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_tr_probe_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_gltf_set_recenter_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_fbx_set_recenter_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_gltf_set_chunking_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_load_gltf_fractured_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_load_obj_bgd(INSTANCE *my, int64_t *params);
@@ -110,6 +113,7 @@ int64_t g3d_ray_hit_z_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_ray_entity_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_submesh_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_submesh_texture_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_model_submesh_is_water_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_submesh_cx_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_submesh_cy_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_submesh_cz_bgd(INSTANCE *my, int64_t *params);
@@ -171,6 +175,9 @@ int64_t g3d_water_set_tessellation_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_fire_add_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_fire_clear_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_water_create_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_fluid_add_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_fluid_clear_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_fluid_style_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_water_set_waves_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_water_set_color_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_water_set_enabled_bgd(INSTANCE *my, int64_t *params);
@@ -278,6 +285,7 @@ int64_t g3d_char_create_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_char_destroy_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_char_move_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_char_jump_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_char_set_water_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_char_update_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_char_set_position_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_char_set_tuning_bgd(INSTANCE *my, int64_t *params);
@@ -351,7 +359,10 @@ DLSYSFUNCS __bgdexport(libmod_3d, functions_exports)[] = {
     FUNC("G3D_CAMERA_SET_PROJECTION", "II", TYPE_INT, g3d_camera_set_projection_bgd),
     FUNC("G3D_CAMERA_SET_FOV", "IF", TYPE_INT, g3d_camera_set_fov_bgd),
     FUNC("G3D_LOAD_GLTF", "S", TYPE_INT, g3d_model_load_gltf_bgd),
+    FUNC("G3D_LOAD_TR", "S", TYPE_INT, g3d_load_tr_bgd),
+    FUNC("G3D_TR_PROBE", "S", TYPE_INT, g3d_tr_probe_bgd),
     FUNC("G3D_GLTF_SET_RECENTER", "I", TYPE_INT, g3d_gltf_set_recenter_bgd),
+    FUNC("G3D_FBX_SET_RECENTER", "I", TYPE_INT, g3d_fbx_set_recenter_bgd),
     FUNC("G3D_GLTF_SET_CHUNKING", "F", TYPE_INT, g3d_gltf_set_chunking_bgd),
     FUNC("G3D_LOAD_GLTF_FRACTURED", "S", TYPE_INT, g3d_model_load_gltf_fractured_bgd),
     FUNC("G3D_LOAD_OBJ", "S", TYPE_INT, g3d_model_load_obj_bgd),
@@ -381,6 +392,7 @@ DLSYSFUNCS __bgdexport(libmod_3d, functions_exports)[] = {
     FUNC("G3D_RAY_ENTITY", "", TYPE_INT, g3d_ray_entity_bgd),
     FUNC("G3D_MODEL_SUBMESH", "II", TYPE_INT, g3d_model_submesh_bgd),
     FUNC("G3D_MODEL_SUBMESH_TEXTURE", "II", TYPE_INT, g3d_model_submesh_texture_bgd),
+    FUNC("G3D_MODEL_SUBMESH_IS_WATER", "II", TYPE_INT, g3d_model_submesh_is_water_bgd),
     FUNC("G3D_MODEL_SUBMESH_CX", "II", TYPE_FLOAT, g3d_model_submesh_cx_bgd),
     FUNC("G3D_MODEL_SUBMESH_CY", "II", TYPE_FLOAT, g3d_model_submesh_cy_bgd),
     FUNC("G3D_MODEL_SUBMESH_CZ", "II", TYPE_FLOAT, g3d_model_submesh_cz_bgd),
@@ -417,6 +429,7 @@ DLSYSFUNCS __bgdexport(libmod_3d, functions_exports)[] = {
     FUNC("G3D_CHAR_DESTROY", "I", TYPE_INT, g3d_char_destroy_bgd),
     FUNC("G3D_CHAR_MOVE", "IFF", TYPE_INT, g3d_char_move_bgd),
     FUNC("G3D_CHAR_JUMP", "IF", TYPE_INT, g3d_char_jump_bgd),
+    FUNC("G3D_CHAR_SET_WATER", "IIF", TYPE_INT, g3d_char_set_water_bgd),
     FUNC("G3D_CHAR_UPDATE", "IF", TYPE_INT, g3d_char_update_bgd),
     FUNC("G3D_CHAR_SET_POSITION", "IFFF", TYPE_INT, g3d_char_set_position_bgd),
     FUNC("G3D_CHAR_SET_TUNING", "IFF", TYPE_INT, g3d_char_set_tuning_bgd),
@@ -492,6 +505,9 @@ DLSYSFUNCS __bgdexport(libmod_3d, functions_exports)[] = {
     FUNC("G3D_FIRE_ADD", "FFFF", TYPE_INT, g3d_fire_add_bgd),
     FUNC("G3D_FIRE_CLEAR", "", TYPE_INT, g3d_fire_clear_bgd),
     FUNC("G3D_WATER_CREATE", "FFI", TYPE_INT, g3d_water_create_bgd),
+    FUNC("G3D_FLUID_ADD", "FFFFFF", TYPE_INT, g3d_fluid_add_bgd),
+    FUNC("G3D_FLUID_CLEAR", "", TYPE_INT, g3d_fluid_clear_bgd),
+    FUNC("G3D_FLUID_STYLE", "FFFFFFFFFF", TYPE_INT, g3d_fluid_style_bgd),
     FUNC("G3D_WATER_SET_WAVES", "FFF", TYPE_INT, g3d_water_set_waves_bgd),
     FUNC("G3D_WATER_SET_COLOR", "FFFFFF", TYPE_INT, g3d_water_set_color_bgd),
     FUNC("G3D_WATER_SET_ENABLED", "I", TYPE_INT, g3d_water_set_enabled_bgd),

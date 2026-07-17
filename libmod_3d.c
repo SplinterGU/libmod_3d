@@ -23,6 +23,7 @@
 #include "libmod_3d_occlusion.h"
 #include "libmod_3d_smaa.h"
 #include "libmod_3d_fsr.h"
+#include "libmod_3d_trlevel.h"
 #include "libmod_3d_physics.h"
 #include "libmod_3d_anim.h"
 #include "libmod_3d_collide.h"
@@ -572,6 +573,25 @@ int64_t g3d_texture_load_bgd(INSTANCE *my, int64_t *params) {
     return (int64_t)(intptr_t)tex;
 }
 
+/* Load an original Tomb Raider level (.PHD/.TR2/.tr4/.TRC) with no conversion
+   step. Returns the model handle, or -1. */
+int64_t g3d_load_tr_bgd(INSTANCE *my, int64_t *params) {
+    g3d_ensure_init();
+    const char *filename = (const char *)string_get(params[0]);
+    G3DModel *model = g3d_tr_load(filename);
+    string_discard(params[0]);
+    if (!model) return -1;
+    return (int64_t)(intptr_t)model;
+}
+
+/* Which TR game a file is (1..5), 0 if it isn't a level. Doesn't load it. */
+int64_t g3d_tr_probe_bgd(INSTANCE *my, int64_t *params) {
+    const char *filename = (const char *)string_get(params[0]);
+    int v = g3d_tr_probe(filename);
+    string_discard(params[0]);
+    return (int64_t)v;
+}
+
 int64_t g3d_model_load_gltf_bgd(INSTANCE *my, int64_t *params) {
     g3d_ensure_init();
     const char *filename = (const char *)string_get(params[0]);
@@ -584,6 +604,11 @@ int64_t g3d_model_load_gltf_bgd(INSTANCE *my, int64_t *params) {
 
 int64_t g3d_gltf_set_recenter_bgd(INSTANCE *my, int64_t *params) {
     g3d_gltf_set_recenter((int)params[0]);
+    return 1;
+}
+
+int64_t g3d_fbx_set_recenter_bgd(INSTANCE *my, int64_t *params) {
+    g3d_fbx_set_recenter((int)params[0]);
     return 1;
 }
 
@@ -834,6 +859,14 @@ int64_t g3d_model_submesh_texture_bgd(INSTANCE *my, int64_t *params) {
         !model->mesh_textures[i])
         return -1;
     return (int64_t)(intptr_t)model->mesh_textures[i];
+}
+
+/* 1 if submesh i is a TR water room (set by the Tomb Raider loader), else 0. */
+int64_t g3d_model_submesh_is_water_bgd(INSTANCE *my, int64_t *params) {
+    G3DModel *model = (G3DModel *)(intptr_t)params[0];
+    int i = (int)params[1];
+    if (!model || i < 0 || i >= (int)model->mesh_count || !model->submesh_water) return 0;
+    return (int64_t)model->submesh_water[i];
 }
 
 /* Per-submesh AABB in model space (centre + half-extents), for fracture chunks:
@@ -1306,6 +1339,29 @@ int64_t g3d_water_create_bgd(INSTANCE *my, int64_t *params) {
     float size = *(float *)&params[1];
     int subdiv = (int)params[2];
     return g3d_water_create(level, size, subdiv);
+}
+
+/* Positioned water pool (a "fluid zone"): a localized animated surface at (cx,cz),
+   size_x*size_z wide, its surface at `level`, `depth` deep. For TR water rooms.
+   Several can coexist (unlike the single global g3d_water_create). */
+int64_t g3d_fluid_add_bgd(INSTANCE *my, int64_t *params) {
+    return (int64_t)g3d_fluid_add(*(float *)&params[0], *(float *)&params[1],
+                                  *(float *)&params[2], *(float *)&params[3],
+                                  *(float *)&params[4], *(float *)&params[5]);
+}
+int64_t g3d_fluid_clear_bgd(INSTANCE *my, int64_t *params) {
+    g3d_fluid_clear();
+    return 1;
+}
+
+/* Estilo de TODAS las zonas de fluido: olas (amp,len,speed), color profundo (rgb)
+   y de orilla (rgb), y opacidad (0=transparente..1=opaco). Sin textura. */
+int64_t g3d_fluid_style_bgd(INSTANCE *my, int64_t *params) {
+    g3d_fluid_set_style(*(float *)&params[0], *(float *)&params[1], *(float *)&params[2],
+                        *(float *)&params[3], *(float *)&params[4], *(float *)&params[5],
+                        *(float *)&params[6], *(float *)&params[7], *(float *)&params[8],
+                        0, *(float *)&params[9]);
+    return 1;
 }
 
 int64_t g3d_water_set_waves_bgd(INSTANCE *my, int64_t *params) {
@@ -1981,6 +2037,9 @@ int64_t g3d_char_move_bgd(INSTANCE *my, int64_t *params) {
 }
 int64_t g3d_char_jump_bgd(INSTANCE *my, int64_t *params) {
     g3d_char_jump((int)params[0], *(float *)&params[1]); return 1;
+}
+int64_t g3d_char_set_water_bgd(INSTANCE *my, int64_t *params) {
+    g3d_char_set_water((int)params[0], (int)params[1], *(float *)&params[2]); return 1;
 }
 int64_t g3d_char_update_bgd(INSTANCE *my, int64_t *params) {
     g3d_char_update((int)params[0], *(float *)&params[1]); return 1;

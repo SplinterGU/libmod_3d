@@ -77,6 +77,7 @@ set(SOURCES_LIBMOD_3D
     libmod_3d_texture.c
     libmod_3d_mesh.c
     libmod_3d_gltf.c
+    libmod_3d_trlevel.c
     libmod_3d_obj.c
     libmod_3d_fbx.c
     ufbx.c
@@ -124,11 +125,19 @@ else()
 endif()
 
 # ============================================================================
-# Optional Jolt Physics backend for rigid bodies (-DUSE_JOLT=ON).
-# When OFF (default) the custom rigid body implementation in
-# libmod_3d_physics.c is used instead -> trivial to switch back.
+# Jolt Physics backend for rigid bodies. ON by default and self-contained:
+# Jolt's source is vendored in jolt/ (MIT, see jolt/LICENSE), so a plain clone
+# of this repo builds it with no submodule, no external checkout and no network.
+# Nothing outside this module is needed.
+#
+# -DUSE_JOLT=OFF falls back to the custom rigid bodies in libmod_3d_physics.c.
+# VITA always uses the fallback (Jolt is excluded there).
 # ============================================================================
-option(USE_JOLT "Use Jolt Physics for rigid bodies" OFF)
+option(USE_JOLT "Use Jolt Physics for rigid bodies" ON)
+if(USE_JOLT AND NOT IS_VITA AND NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/jolt/Build/CMakeLists.txt")
+    message(WARNING "USE_JOLT is ON but jolt/ is missing - falling back to the built-in rigid bodies")
+    set(USE_JOLT OFF)
+endif()
 if(USE_JOLT AND NOT IS_VITA)
     list(APPEND SOURCES_LIBMOD_3D libmod_3d_jolt.cpp)
 endif()
@@ -145,7 +154,7 @@ if(USE_JOLT AND NOT IS_VITA)
     # Jolt is a static lib linked into our .so -> must be position-independent.
     set(CMAKE_POSITION_INDEPENDENT_CODE ON)
     set(INTERPROCEDURAL_OPTIMIZATION OFF CACHE BOOL "" FORCE)
-    add_subdirectory(../../vendor/JoltPhysics/Build ${CMAKE_BINARY_DIR}/jolt EXCLUDE_FROM_ALL)
+    add_subdirectory(jolt/Build ${CMAKE_BINARY_DIR}/jolt EXCLUDE_FROM_ALL)
     set_target_properties(Jolt PROPERTIES POSITION_INDEPENDENT_CODE ON INTERPROCEDURAL_OPTIMIZATION OFF)
     target_compile_definitions(mod_3d PRIVATE USE_JOLT)
     target_link_libraries(mod_3d Jolt)
