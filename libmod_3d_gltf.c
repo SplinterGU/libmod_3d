@@ -23,6 +23,7 @@
 #include <SDL_image.h>
 
 #ifndef VITA
+#define GL_GLEXT_PROTOTYPES
 #include <GL/gl.h>
 #include <GL/glext.h>
 #endif

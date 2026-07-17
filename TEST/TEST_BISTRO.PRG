@@ -26,7 +26,7 @@ PRIVATE
     float atime; int fanim; int k4; int nanim; int fsmaa; int k5;
 BEGIN
     set_mode(1920, 1080, MODE_FULLSCREEN);
-    set_fps(0, 0);
+    set_fps(60, 0);
 
     scene = g3d_scene_create("bistro");
     g3d_scene_set_active(scene);
@@ -86,14 +86,14 @@ BEGIN
         IF (key(_L_SHIFT) OR key(_R_SHIFT)) spd = mh * 0.03; END
         IF (key(_CONTROL)) spd = mh * 0.1; END
         g3d_mouse_update();
-        yaw = yaw + g3d_mouse_dx() * msens; pitch = pitch - g3d_mouse_dy() * msens;
+        yaw = yaw - g3d_mouse_dx() * msens; pitch = pitch - g3d_mouse_dy() * msens;
         IF (pitch > 89.0) pitch = 89.0; END IF (pitch < -89.0) pitch = -89.0; END
         fwx = sin(yaw * 1000) * cos(pitch * 1000); fwy = sin(pitch * 1000); fwz = cos(yaw * 1000) * cos(pitch * 1000);
         rgx = cos(yaw * 1000); rgz = -sin(yaw * 1000);
         IF (key(_W)) camx += fwx * spd; camy += fwy * spd; camz += fwz * spd; END
         IF (key(_S)) camx -= fwx * spd; camy -= fwy * spd; camz -= fwz * spd; END
-        IF (key(_D)) camx += rgx * spd; camz += rgz * spd; END
-        IF (key(_A)) camx -= rgx * spd; camz -= rgz * spd; END
+        IF (key(_A)) camx += rgx * spd; camz += rgz * spd; END
+        IF (key(_D)) camx -= rgx * spd; camz -= rgz * spd; END
         g3d_camera_set_position(camera, camx, camy, camz);
         g3d_camera_look_at(camera, camx + fwx, camy + fwy, camz + fwz, 0.0, 1.0, 0.0);
 
@@ -115,6 +115,9 @@ BEGIN
             g3d_model_animate_all(model, atime, 1);
             atime = atime + dt;
         END
+
+        IF (key_up(_F1)) set_fps(0,0); END
+        IF (key_up(_F2)) set_fps(60,0); END
 
         IF (key(_ESC)) BREAK; END
         FRAME;

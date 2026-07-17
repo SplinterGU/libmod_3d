@@ -103,7 +103,7 @@ PRIVATE
     float fwx; float fwy; float fwz; float rgx; float rgz;
 BEGIN
     set_mode(1920, 1080, MODE_FULLSCREEN);
-    set_fps(0, 0);
+    set_fps(60, 0);
 
     scene = g3d_scene_create("gta3s");
     g3d_scene_set_active(scene);
@@ -176,18 +176,18 @@ BEGIN
         loaded = g3d_stream_loaded_count();
 
         // --- camara libre ---
-        spd = SEC * 0.015;
+        spd = SEC * 0.00015;
         IF (key(_L_SHIFT) OR key(_R_SHIFT)) spd = SEC * 0.06; END
         IF (key(_CONTROL)) spd = SEC * 0.18; END
         g3d_mouse_update();
-        yaw = yaw + g3d_mouse_dx() * msens; pitch = pitch - g3d_mouse_dy() * msens;
+        yaw = yaw - g3d_mouse_dx() * msens; pitch = pitch - g3d_mouse_dy() * msens;
         IF (pitch > 89.0) pitch = 89.0; END IF (pitch < -89.0) pitch = -89.0; END
         fwx = sin(yaw * 1000) * cos(pitch * 1000); fwy = sin(pitch * 1000); fwz = cos(yaw * 1000) * cos(pitch * 1000);
         rgx = cos(yaw * 1000); rgz = -sin(yaw * 1000);
         IF (key(_W)) camx += fwx * spd; camy += fwy * spd; camz += fwz * spd; END
         IF (key(_S)) camx -= fwx * spd; camy -= fwy * spd; camz -= fwz * spd; END
-        IF (key(_D)) camx += rgx * spd; camz += rgz * spd; END
-        IF (key(_A)) camx -= rgx * spd; camz -= rgz * spd; END
+        IF (key(_A)) camx += rgx * spd; camz += rgz * spd; END
+        IF (key(_D)) camx -= rgx * spd; camz -= rgz * spd; END
         g3d_camera_set_position(camera, camx, camy, camz);
         g3d_camera_look_at(camera, camx + fwx, camy + fwy, camz + fwz, 0.0, 1.0, 0.0);
 
