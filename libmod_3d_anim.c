@@ -19,6 +19,28 @@ int g3d_model_animation_count(G3DModel *model) {
     return model ? model->animation_count : 0;
 }
 
+/* Name of animation `i` (empty string if out of range). For editor listings. */
+const char *g3d_model_animation_name(G3DModel *model, int i) {
+    if (!model || i < 0 || i >= model->animation_count) return "";
+    return model->animations[i].name;
+}
+
+/* Combined AABB of all the model's meshes (out_min/out_max are float[3]).
+   Returns 1 on success. Lets the editor frame a model in a preview camera. */
+int g3d_model_bounds(G3DModel *model, float *out_min, float *out_max) {
+    if (!model || model->mesh_count == 0 || !out_min || !out_max) return 0;
+    for (int k = 0; k < 3; k++) {
+        out_min[k] = model->meshes[0].aabb_min[k];
+        out_max[k] = model->meshes[0].aabb_max[k];
+    }
+    for (uint32_t i = 1; i < model->mesh_count; i++)
+        for (int k = 0; k < 3; k++) {
+            if (model->meshes[i].aabb_min[k] < out_min[k]) out_min[k] = model->meshes[i].aabb_min[k];
+            if (model->meshes[i].aabb_max[k] > out_max[k]) out_max[k] = model->meshes[i].aabb_max[k];
+        }
+    return 1;
+}
+
 float g3d_model_animation_duration(G3DModel *model, int anim) {
     if (!model || anim < 0 || anim >= model->animation_count)
         return 0.0f;

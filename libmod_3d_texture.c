@@ -23,23 +23,12 @@
    ============================================================================
  */
 
-G3DTexture *g3d_texture_load_impl(const char *filepath) {
-    if (!filepath) {
-        fprintf(stderr, "G3D: No filepath provided for texture\n");
-        return NULL;
-    }
-
-    printf("G3D: Loading texture: %s\n", filepath);
-
-    /* Load image via SDL2_image */
 #ifndef VITA
-    SDL_Surface *surface = IMG_Load(filepath);
-    if (!surface) {
-        fprintf(stderr, "G3D: Failed to load texture: %s\n", IMG_GetError());
-        return NULL;
-    }
+/* Convert an SDL surface to a G3DTexture (RGBA), freeing the surface. Shared by
+   the file loader and the in-memory loader (embedded FBX textures). */
+static G3DTexture *surface_to_g3d(SDL_Surface *surface, const char *name) {
+    if (!surface) return NULL;
 
-    /* Create texture structure */
     G3DTexture *texture = (G3DTexture *)malloc(sizeof(G3DTexture));
     if (!texture) {
         SDL_FreeSurface(surface);
@@ -48,11 +37,10 @@ G3DTexture *g3d_texture_load_impl(const char *filepath) {
 
     memset(texture, 0, sizeof(G3DTexture));
 
-    /* Fill metadata */
     texture->id = 1;  /* TODO: Use proper texture ID pool */
-    strncpy(texture->name, filepath, 63);
+    strncpy(texture->name, name ? name : "tex", 63);
     texture->name[63] = '\0';
-    strncpy(texture->filepath, filepath, 255);
+    strncpy(texture->filepath, name ? name : "tex", 255);
     texture->filepath[255] = '\0';
 
     texture->width = surface->w;
@@ -116,12 +104,47 @@ G3DTexture *g3d_texture_load_impl(const char *filepath) {
            texture->height);
 
     return texture;
+}
+#endif
+
+G3DTexture *g3d_texture_load_impl(const char *filepath) {
+    if (!filepath) {
+        fprintf(stderr, "G3D: No filepath provided for texture\n");
+        return NULL;
+    }
+    printf("G3D: Loading texture: %s\n", filepath);
+#ifndef VITA
+    SDL_Surface *surface = IMG_Load(filepath);
+    if (!surface) {
+        fprintf(stderr, "G3D: Failed to load texture: %s\n", IMG_GetError());
+        return NULL;
+    }
+    return surface_to_g3d(surface, filepath);
 #else
     /* VITA: Stub */
     G3DTexture *texture = (G3DTexture *)malloc(sizeof(G3DTexture));
     memset(texture, 0, sizeof(G3DTexture));
     strncpy(texture->filepath, filepath, 255);
     return texture;
+#endif
+}
+
+/* Load a texture from an in-memory encoded image (PNG/JPG/etc. bytes), e.g. a
+   texture embedded inside an FBX. NULL on failure. */
+G3DTexture *g3d_texture_load_mem(const char *name, const void *data, unsigned long size) {
+#ifndef VITA
+    if (!data || size == 0) return NULL;
+    SDL_RWops *rw = SDL_RWFromConstMem(data, (int)size);
+    if (!rw) return NULL;
+    SDL_Surface *surface = IMG_Load_RW(rw, 1);   /* 1 = free the RWops */
+    if (!surface) {
+        fprintf(stderr, "G3D: embedded texture decode failed: %s\n", IMG_GetError());
+        return NULL;
+    }
+    printf("G3D: embedded texture '%s' %dx%d\n", name ? name : "?", surface->w, surface->h);
+    return surface_to_g3d(surface, name);
+#else
+    (void)name; (void)data; (void)size; return NULL;
 #endif
 }
 

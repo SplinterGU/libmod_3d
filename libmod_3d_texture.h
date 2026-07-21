@@ -52,6 +52,10 @@ typedef struct {
 /* Load texture from file (PNG, JPG, etc) */
 G3DTexture *g3d_texture_load_impl(const char *filepath);
 
+/* Load a texture from an in-memory encoded image (PNG/JPG bytes), e.g. embedded
+   in an FBX. NULL on failure. */
+G3DTexture *g3d_texture_load_mem(const char *name, const void *data, unsigned long size);
+
 /* Create texture from raw pixel data */
 G3DTexture *g3d_texture_create_from_data(const char *name, uint32_t width,
                                           uint32_t height, uint32_t channels,

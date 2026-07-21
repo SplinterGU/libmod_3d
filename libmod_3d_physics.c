@@ -436,10 +436,25 @@ void g3d_char_update(int id, float dt) {
 #endif
     float ny_new = c->py + c->vy * dt;
 
+    /* ground snap: if we were on the ground and are only gently leaving it
+       (walking downhill or down a small step, not jumping), stick to the floor
+       instead of launching into the air for a few frames. Without this, walking
+       downslope makes `grounded` flicker every frame and the game keeps popping
+       into its jump/fall animation. The snap distance scales with speed so a
+       fast run down a slope still stays glued. */
+    float horiz = sqrtf(c->vx * c->vx + c->vz * c->vz);
+    float snap = c->step + horiz * dt * 1.5f + 0.15f;
+    int was_grounded = c->grounded;
+
     if (c->vy <= 0.0f && ny_new <= ground) {                  /* landing / standing */
         c->py = ground;
         c->vy = 0.0f;
         c->grounded = !steep;                                 /* steep: keep sliding */
+    } else if (was_grounded && !steep && c->vy <= 0.0f &&
+               ny_new > ground && (c->py - ground) <= snap) { /* follow ground down */
+        c->py = ground;
+        c->vy = 0.0f;
+        c->grounded = 1;
     } else {
         /* ceiling: head hits the underside of a box */
         float head0 = c->py + c->height, head1 = ny_new + c->height;

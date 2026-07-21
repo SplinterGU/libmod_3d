@@ -328,6 +328,7 @@ void g3d_mesh_free(G3DMesh *mesh) {
     free(mesh->bind_nrm);
     free(mesh->vjoints);
     free(mesh->vweights);
+    free(mesh->terrain_holes);
 
     free(mesh);
 }

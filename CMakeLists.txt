@@ -89,6 +89,7 @@ set(SOURCES_LIBMOD_3D
     libmod_3d_light.c
     libmod_3d_primitives.c
     libmod_3d_terrain.c
+    libmod_3d_zone.c
     libmod_3d_paint.c
     libmod_3d_water.c
     libmod_3d_flow.c

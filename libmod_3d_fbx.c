@@ -57,6 +57,13 @@ static int has_ci(const char *hay, const char *needle) {
 /* FBX texture paths are often wrong on disk; search common spots by base name. */
 static G3DTexture *fbx_find_texture(const char *dir, ufbx_texture *tex) {
     if (!tex) return NULL;
+    /* Embedded texture (FBX exported with textures inside): decode from memory,
+       no external file needed. This is what makes a self-contained FBX portable. */
+    if (tex->content.size > 0 && tex->content.data) {
+        G3DTexture *t = g3d_texture_load_mem(tex->name.length ? tex->name.data : "embedded",
+                                             tex->content.data, (unsigned long)tex->content.size);
+        if (t) { g3d_texture_upload_gpu(t); return t; }
+    }
     char cand[600];
     if (tex->filename.length && file_exists(tex->filename.data)) return load_upload(tex->filename.data);
     if (tex->relative_filename.length) {
@@ -146,6 +153,15 @@ G3DModel *g3d_fbx_load(const char *filepath) {
     memset(&opts, 0, sizeof(opts));
     opts.target_axes = ufbx_axes_right_handed_y_up;
     opts.target_unit_meters = 1.0f;
+    /* Bake the axis/unit conversion into the GEOMETRY (not just the root node).
+       Without this, a file authored in cm (e.g. Mixamo) keeps its mesh vertices
+       at the original scale while the unit conversion (x0.01) lands on the node
+       transforms: the skinned result comes out 100x smaller than the bind-pose
+       AABB the spawn scale is computed from, so a skinned character collapses to
+       an invisible speck. MODIFY_GEOMETRY keeps vertices, skin bind matrices and
+       node transforms all in the same (converted) space, with clean unit-scale
+       bones. Files already in meters are unaffected. */
+    opts.space_conversion = UFBX_SPACE_CONVERSION_MODIFY_GEOMETRY;
     opts.generate_missing_normals = true;
     ufbx_error err;
     ufbx_scene *scene = ufbx_load_file(filepath, &opts, &err);
@@ -164,6 +180,7 @@ G3DModel *g3d_fbx_load(const char *filepath) {
     model->node_cur_r = (Quat *)malloc(nc * sizeof(Quat));
     model->node_cur_s = (Vec3 *)malloc(nc * sizeof(Vec3));
     model->node_global = (Mat4 *)malloc(nc * sizeof(Mat4));
+    model->node_name = (char **)calloc((size_t)(nc > 0 ? nc : 1), sizeof(char *));
     for (int i = 0; i < nc; i++) {
         ufbx_node *n = scene->nodes.data[i];
         model->node_parent[i] = n->parent ? (int)n->parent->typed_id : -1;
@@ -173,6 +190,10 @@ G3DModel *g3d_fbx_load(const char *filepath) {
         model->node_cur_t[i] = model->node_base_t[i];
         model->node_cur_r[i] = model->node_base_r[i];
         model->node_cur_s[i] = model->node_base_s[i];
+        if (model->node_name && n->name.length) {
+            model->node_name[i] = (char *)malloc(n->name.length + 1);
+            if (model->node_name[i]) memcpy(model->node_name[i], n->name.data, n->name.length + 1);
+        }
     }
 
     /* ---- joints: union of all skin clusters' bones (dedup by node) ---- */
@@ -204,7 +225,19 @@ G3DModel *g3d_fbx_load(const char *filepath) {
     model->joint_matrix = (Mat4 *)malloc((jc > 0 ? jc : 1) * sizeof(Mat4));
     for (int j = 0; j < jc; j++) { model->joint_node[j] = joint_node[j]; model->inverse_bind[j] = inv_bind[j]; }
     free(joint_node); free(inv_bind);
+
+    /* Root joint = the skeleton bone with no ancestor that is also a joint (e.g.
+       mixamorig:Hips). Using joint_node[0] instead grabbed whichever bone the
+       first skin cluster referenced (often a finger), so lock_root stripped the
+       wrong node and the walk's hip translation leaked through -> the character
+       lurched forward and snapped back every loop. */
     model->root_node = jc > 0 ? model->joint_node[0] : -1;
+    for (int j = 0; j < jc; j++) {
+        int p = model->node_parent[model->joint_node[j]];
+        int has_joint_ancestor = 0;
+        while (p >= 0) { if (node_to_joint[p] >= 0) { has_joint_ancestor = 1; break; } p = model->node_parent[p]; }
+        if (!has_joint_ancestor) { model->root_node = model->joint_node[j]; break; }
+    }
 
     /* ---- meshes -> one submesh per (mesh, material) ---- */
     int scap = 16, scount = 0;

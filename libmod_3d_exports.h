@@ -114,6 +114,10 @@ int64_t g3d_ray_entity_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_submesh_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_submesh_texture_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_submesh_is_water_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_model_node_find_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_model_node_x_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_model_node_y_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_model_node_z_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_submesh_cx_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_submesh_cy_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_model_submesh_cz_bgd(INSTANCE *my, int64_t *params);
@@ -245,6 +249,7 @@ int64_t g3d_scene_player_radius_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_scene_player_height_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_scene_player_climb_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_pick_terrain_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_pick_entity_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_pick_x_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_pick_y_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_pick_z_bgd(INSTANCE *my, int64_t *params);
@@ -276,8 +281,14 @@ int64_t g3d_primitive_plane_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_primitive_terrain_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_terrain_get_height_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_terrain_raise_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_terrain_hole_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_terrain_smooth_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_terrain_flatten_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_terrain_load_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_scene_set_terrain_collider_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_zone_init_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_zone_load_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_zone_blocked_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_primitive_cliffs_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_primitive_mountain_bgd(INSTANCE *my, int64_t *params);
 /* physics: collision + character controller */
@@ -393,6 +404,10 @@ DLSYSFUNCS __bgdexport(libmod_3d, functions_exports)[] = {
     FUNC("G3D_MODEL_SUBMESH", "II", TYPE_INT, g3d_model_submesh_bgd),
     FUNC("G3D_MODEL_SUBMESH_TEXTURE", "II", TYPE_INT, g3d_model_submesh_texture_bgd),
     FUNC("G3D_MODEL_SUBMESH_IS_WATER", "II", TYPE_INT, g3d_model_submesh_is_water_bgd),
+    FUNC("G3D_MODEL_NODE_FIND", "IS", TYPE_INT, g3d_model_node_find_bgd),
+    FUNC("G3D_MODEL_NODE_X", "II", TYPE_FLOAT, g3d_model_node_x_bgd),
+    FUNC("G3D_MODEL_NODE_Y", "II", TYPE_FLOAT, g3d_model_node_y_bgd),
+    FUNC("G3D_MODEL_NODE_Z", "II", TYPE_FLOAT, g3d_model_node_z_bgd),
     FUNC("G3D_MODEL_SUBMESH_CX", "II", TYPE_FLOAT, g3d_model_submesh_cx_bgd),
     FUNC("G3D_MODEL_SUBMESH_CY", "II", TYPE_FLOAT, g3d_model_submesh_cy_bgd),
     FUNC("G3D_MODEL_SUBMESH_CZ", "II", TYPE_FLOAT, g3d_model_submesh_cz_bgd),
@@ -579,6 +594,7 @@ DLSYSFUNCS __bgdexport(libmod_3d, functions_exports)[] = {
     FUNC("G3D_SCENE_PLAYER_HEIGHT", "", TYPE_FLOAT, g3d_scene_player_height_bgd),
     FUNC("G3D_SCENE_PLAYER_CLIMB", "", TYPE_FLOAT, g3d_scene_player_climb_bgd),
     FUNC("G3D_PICK_TERRAIN", "IFFFFI", TYPE_INT, g3d_pick_terrain_bgd),
+    FUNC("G3D_PICK_ENTITY", "IFFFF", TYPE_INT, g3d_pick_entity_bgd),
     FUNC("G3D_PICK_X", "", TYPE_FLOAT, g3d_pick_x_bgd),
     FUNC("G3D_PICK_Y", "", TYPE_FLOAT, g3d_pick_y_bgd),
     FUNC("G3D_PICK_Z", "", TYPE_FLOAT, g3d_pick_z_bgd),
@@ -611,8 +627,14 @@ DLSYSFUNCS __bgdexport(libmod_3d, functions_exports)[] = {
     FUNC("G3D_PRIMITIVE_TERRAIN", "IFFFI", TYPE_INT, g3d_primitive_terrain_bgd),
     FUNC("G3D_TERRAIN_GET_HEIGHT", "IFF", TYPE_FLOAT, g3d_terrain_get_height_bgd),
     FUNC("G3D_TERRAIN_RAISE", "IFFFF", TYPE_INT, g3d_terrain_raise_bgd),
+    FUNC("G3D_TERRAIN_HOLE", "IFFFI", TYPE_INT, g3d_terrain_hole_bgd),
     FUNC("G3D_TERRAIN_SMOOTH", "IFFFF", TYPE_INT, g3d_terrain_smooth_bgd),
     FUNC("G3D_TERRAIN_FLATTEN", "IFFFFF", TYPE_INT, g3d_terrain_flatten_bgd),
+    FUNC("G3D_TERRAIN_LOAD", "IS", TYPE_INT, g3d_terrain_load_bgd),
+    FUNC("G3D_SET_TERRAIN_COLLIDER", "I", TYPE_INT, g3d_scene_set_terrain_collider_bgd),
+    FUNC("G3D_ZONE_INIT", "IF", TYPE_INT, g3d_zone_init_bgd),
+    FUNC("G3D_ZONE_LOAD", "S", TYPE_INT, g3d_zone_load_bgd),
+    FUNC("G3D_ZONE_BLOCKED", "FFI", TYPE_INT, g3d_zone_blocked_bgd),
     FUNC("G3D_PRIMITIVE_CLIFFS", "IFFFIFF", TYPE_INT, g3d_primitive_cliffs_bgd),
     FUNC("G3D_PRIMITIVE_MOUNTAIN", "IFFFIF", TYPE_INT, g3d_primitive_mountain_bgd),
     FUNC("G3D_ENTITY_SET_MESH", "II", TYPE_INT, g3d_entity_set_mesh_bgd),

@@ -83,6 +83,10 @@ typedef struct {
        centered at origin, spanning terrain_world_size units. Enables editing. */
     int terrain_side;
     float terrain_world_size;
+    /* Optional per-cell hole mask ((side-1)*(side-1) bytes, 1 = hole). NULL when
+       the terrain has no holes. A hole drops that cell's two triangles from the
+       EBO so you can see through the ground (e.g. into a voxel cave below). */
+    unsigned char *terrain_holes;
 
     /* Skinning (CPU). All NULL / 0 when the mesh is not skinned. */
     int skinned;
@@ -133,6 +137,7 @@ typedef struct {
     Quat *node_cur_r;
     Vec3 *node_cur_s;
     Mat4 *node_global;          /* computed global transform per node */
+    char **node_name;           /* node names (for attaching weapons to a bone) */
 
     /* Skin joints */
     int joint_count;

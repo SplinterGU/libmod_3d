@@ -14,6 +14,12 @@ extern "C" {
 /* Number of animations the model carries. */
 int g3d_model_animation_count(G3DModel *model);
 
+/* Name of animation `i` ("" if out of range). */
+const char *g3d_model_animation_name(G3DModel *model, int i);
+
+/* Combined AABB of the model's meshes into out_min/out_max (float[3]). 1 = ok. */
+int g3d_model_bounds(G3DModel *model, float *out_min, float *out_max);
+
 /* Duration (seconds) of an animation, or 0. */
 float g3d_model_animation_duration(G3DModel *model, int anim);
 

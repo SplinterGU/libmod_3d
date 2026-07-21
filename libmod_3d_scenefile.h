@@ -10,6 +10,8 @@
 #ifndef __LIBMOD_3D_SCENEFILE_H
 #define __LIBMOD_3D_SCENEFILE_H
 
+#include "libmod_3d_mesh.h"   /* G3DMesh (terrain collider registration) */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -31,6 +33,11 @@ float g3d_scene_water_level(void);
    height field). H is row-major H[iz*side+ix], covering world [-ws/2,ws/2] on
    X/Z. Returns 0 if the scene has no heightmap. */
 int   g3d_scene_heightfield(const float **H, int *side, float *world_size);
+
+/* Register a runtime-built terrain mesh as the collision heightfield (so rigid
+   bodies / characters rest on a g3d_primitive_terrain + g3d_terrain_load relief,
+   not just on scenes loaded from disk). Returns 1 on success. */
+int   g3d_scene_set_terrain_collider(G3DMesh *mesh);
 
 /* Player spawn point placed in the editor (SPAWN directive). */
 int   g3d_scene_has_spawn(void);

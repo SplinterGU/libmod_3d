@@ -71,6 +71,26 @@ int g3d_scene_heightfield(const float **H, int *side, float *world_size) {
     return 1;
 }
 
+/* Register a runtime-built terrain mesh (g3d_primitive_terrain + g3d_terrain_load)
+   as the collision heightfield, so rigid bodies and characters rest on the sculpted
+   relief. Without this only a scene loaded from disk (g3d_scene_load) had collision.
+   Copies the mesh's per-vertex Y (row-major iz*side+ix, matching g3d_heightfield_height).
+   Returns 1 on success. */
+int g3d_scene_set_terrain_collider(G3DMesh *m) {
+    if (!m || m->terrain_side < 2) return 0;
+    int side = m->terrain_side;
+    long n = (long)side * side;
+    if ((long)m->vertex_count < n) return 0;
+    float *H = (float *)malloc(n * sizeof(float));
+    if (!H) return 0;
+    for (long i = 0; i < n; i++) H[i] = m->vertices[i].position[1];
+    if (g_scene_H) free(g_scene_H);
+    g_scene_H = H;
+    g_scene_side = side;
+    g_scene_ws = m->terrain_world_size > 0.0f ? m->terrain_world_size : 400.0f;
+    return 1;
+}
+
 /* Water surface level of the last-loaded scene (first lake / global water), or a
    very negative value if the scene has no water. */
 float g3d_scene_water_level(void) {

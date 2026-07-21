@@ -12,6 +12,7 @@
 #include "libmod_3d_light.h"
 #include "libmod_3d_primitives.h"
 #include "libmod_3d_terrain.h"
+#include "libmod_3d_zone.h"
 #include "libmod_3d_water.h"
 #include "libmod_3d_fire.h"
 #include "libmod_3d_obj.h"
@@ -44,6 +45,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <stdint.h>
 #include <stddef.h>
 
@@ -455,6 +457,12 @@ int64_t g3d_terrain_raise_bgd(INSTANCE *my, int64_t *params) {
     return g3d_terrain_raise(mesh, x, z, radius, strength);
 }
 
+int64_t g3d_terrain_hole_bgd(INSTANCE *my, int64_t *params) {
+    G3DMesh *mesh = (G3DMesh *)(intptr_t)params[0];
+    return g3d_terrain_set_hole(mesh, *(float *)&params[1], *(float *)&params[2],
+                                *(float *)&params[3], (int)params[4]);
+}
+
 int64_t g3d_terrain_smooth_bgd(INSTANCE *my, int64_t *params) {
     G3DMesh *mesh = (G3DMesh *)(intptr_t)params[0];
     float x = *(float *)&params[1];
@@ -472,6 +480,33 @@ int64_t g3d_terrain_flatten_bgd(INSTANCE *my, int64_t *params) {
     float target = *(float *)&params[4];
     float amount = *(float *)&params[5];
     return g3d_terrain_flatten(mesh, x, z, radius, target, amount);
+}
+
+int64_t g3d_terrain_load_bgd(INSTANCE *my, int64_t *params) {
+    G3DMesh *mesh = (G3DMesh *)(intptr_t)params[0];
+    const char *path = (const char *)string_get(params[1]);
+    int r = g3d_terrain_load(mesh, path);
+    string_discard(params[1]);
+    return r;
+}
+
+int64_t g3d_scene_set_terrain_collider_bgd(INSTANCE *my, int64_t *params) {
+    G3DMesh *mesh = (G3DMesh *)(intptr_t)params[0];
+    return g3d_scene_set_terrain_collider(mesh);
+}
+
+int64_t g3d_zone_init_bgd(INSTANCE *my, int64_t *params) {
+    g3d_zone_init((int)params[0], *(float *)&params[1]);
+    return 1;
+}
+int64_t g3d_zone_load_bgd(INSTANCE *my, int64_t *params) {
+    const char *path = (const char *)string_get(params[0]);
+    int r = g3d_zone_load(path);
+    string_discard(params[0]);
+    return r;
+}
+int64_t g3d_zone_blocked_bgd(INSTANCE *my, int64_t *params) {
+    return g3d_zone_blocked(*(float *)&params[0], *(float *)&params[1], (int)params[2]);
 }
 
 int64_t g3d_primitive_cliffs_bgd(INSTANCE *my, int64_t *params) {
@@ -836,6 +871,55 @@ int64_t g3d_model_submesh_is_water_bgd(INSTANCE *my, int64_t *params) {
     int i = (int)params[1];
     if (!model || i < 0 || i >= (int)model->mesh_count || !model->submesh_water) return 0;
     return (int64_t)model->submesh_water[i];
+}
+
+/* Case-insensitive substring (so "hand_r" finds "mixamorig:RightHand"). */
+static int g3d_str_has_ci(const char *hay, const char *needle) {
+    if (!hay || !needle) return 0;
+    size_t nl = strlen(needle);
+    if (nl == 0) return 0;
+    for (const char *p = hay; *p; p++) {
+        size_t i = 0;
+        while (i < nl && p[i] &&
+               tolower((unsigned char)p[i]) == tolower((unsigned char)needle[i])) i++;
+        if (i == nl) return 1;
+    }
+    return 0;
+}
+
+/* Find a skeleton node (bone) by name (case-insensitive substring). -1 if none.
+   For attaching weapons/props to a bone: find it once, then read its world
+   position each frame (after g3d_model_animate) with G3D_MODEL_NODE_X/Y/Z. */
+int64_t g3d_model_node_find_bgd(INSTANCE *my, int64_t *params) {
+    G3DModel *m = (G3DModel *)(intptr_t)params[0];
+    const char *name = (const char *)string_get(params[1]);
+    int r = -1;
+    if (m && m->node_name && name) {
+        for (int i = 0; i < m->node_count; i++)
+            if (g3d_str_has_ci(m->node_name[i], name)) { r = i; break; }
+    }
+    string_discard(params[1]);
+    return (int64_t)r;
+}
+
+/* Bone position in MODEL space (its animated global translation + skin offset),
+   updated by the last g3d_model_animate. World = char_pos + Ry(scale*this). */
+static float g3d_node_axis(void *mp, int node, int comp) {
+    G3DModel *m = (G3DModel *)mp;
+    if (!m || !m->node_global || node < 0 || node >= m->node_count) return 0.0f;
+    return m->node_global[node].m[12 + comp] + m->skin_offset[comp];
+}
+int64_t g3d_model_node_x_bgd(INSTANCE *my, int64_t *params) {
+    float v = g3d_node_axis((void *)(intptr_t)params[0], (int)params[1], 0);
+    return (int64_t) * (int32_t *)&v;
+}
+int64_t g3d_model_node_y_bgd(INSTANCE *my, int64_t *params) {
+    float v = g3d_node_axis((void *)(intptr_t)params[0], (int)params[1], 1);
+    return (int64_t) * (int32_t *)&v;
+}
+int64_t g3d_model_node_z_bgd(INSTANCE *my, int64_t *params) {
+    float v = g3d_node_axis((void *)(intptr_t)params[0], (int)params[1], 2);
+    return (int64_t) * (int32_t *)&v;
 }
 
 /* Per-submesh AABB in model space (centre + half-extents), for fracture chunks:
@@ -1667,6 +1751,15 @@ int64_t g3d_pick_terrain_bgd(INSTANCE *my, int64_t *params) {
     float h = *(float *)&params[4];
     G3DMesh *terrain = (params[5] > 0) ? (G3DMesh *)(intptr_t)params[5] : NULL;
     return g3d_pick_terrain(cam, sx, sy, w, h, terrain);
+}
+int64_t g3d_pick_entity_bgd(INSTANCE *my, int64_t *params) {
+    extern G3DCamera *g3d_bgd_camera_get(int id);
+    G3DCamera *cam = g3d_bgd_camera_get((int)params[0]);
+    float sx = *(float *)&params[1];
+    float sy = *(float *)&params[2];
+    float w = *(float *)&params[3];
+    float h = *(float *)&params[4];
+    return g3d_pick_entity(cam, sx, sy, w, h);   /* hit point via g3d_pick_x/y/z */
 }
 int64_t g3d_pick_x_bgd(INSTANCE *my, int64_t *params) {
     float v = g3d_pick_x(); return (int64_t) * (int32_t *)&v;

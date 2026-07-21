@@ -26,7 +26,7 @@ CONST
     //   .../Tomb-Raider-1/00-Laras-Home.PHD
     //   .../Tomb-Raider-3/00-Laras-Home.TR2
     //   .../Tomb-Raider-5/01-Streets-of-Rome.TRC
-    LEVEL = "/home/ruben/Escritorio/viewer/Tomb-Raider-1-2-3-4-5-Map-viewer-and-levels-master/Tomb-Raider-2/00-Laras-Home.TR2";
+    LEVEL = "/home/ruben/Escritorio/viewer/Tomb-Raider-1-2-3-4-5-Map-viewer-and-levels-master/Tomb-Raider-2/02-Venice.TR2";
     LARA  = "assets/lara_trr.glb";     // Lara de TR Remastered (exportado del .blend)
 
     // Este modelo NO trae ciclos de animacion, solo POSES (1 frame cada una).

@@ -62,6 +62,68 @@ float g3d_terrain_get_height(G3DMesh *m, float wx, float wz) {
     return h0 + (h1 - h0) * fz;
 }
 
+/* ============================================================================
+   TERRAIN HOLES  (drop grid cells from the EBO so you can see through the
+   ground -- e.g. into a voxel cave below). The vertices stay; only the index
+   buffer changes, so it's cheap and reversible.
+   ============================================================================ */
+
+/* Rebuild the EBO from the grid, skipping cells flagged as holes. */
+static void terrain_rebuild_indices(G3DMesh *m) {
+    int side = m->terrain_side, grid = side - 1;
+    uint32_t k = 0;
+    for (int j = 0; j < grid; j++)
+        for (int i = 0; i < grid; i++) {
+            if (m->terrain_holes && m->terrain_holes[j * grid + i]) continue;
+            uint32_t a = (uint32_t)(j * side + i);
+            uint32_t b = (uint32_t)(j * side + i + 1);
+            uint32_t c = (uint32_t)((j + 1) * side + i);
+            uint32_t d = (uint32_t)((j + 1) * side + i + 1);
+            m->indices[k++] = a; m->indices[k++] = c; m->indices[k++] = b;
+            m->indices[k++] = b; m->indices[k++] = c; m->indices[k++] = d;
+        }
+    m->index_count = k;
+    g3d_mesh_update_indices_gpu(m);
+}
+
+int g3d_terrain_set_hole(G3DMesh *m, float wx, float wz, float radius, int on) {
+    if (!terrain_valid(m)) return 0;
+    int side = m->terrain_side, grid = side - 1;
+    if (grid < 1) return 0;
+    if (!m->terrain_holes) {
+        m->terrain_holes = (unsigned char *)calloc((size_t)grid * grid, 1);
+        if (!m->terrain_holes) return 0;
+    }
+    float W = m->terrain_world_size, cell = W / (float)grid;
+    float gx, gz; world_to_grid(m, wx, wz, &gx, &gz);
+    int rc = (int)(radius / cell) + 1;
+    int ci = (int)floorf(gx), cj = (int)floorf(gz);
+    int changed = 0;
+    for (int j = cj - rc; j <= cj + rc; j++)
+        for (int i = ci - rc; i <= ci + rc; i++) {
+            if (i < 0 || i >= grid || j < 0 || j >= grid) continue;
+            float cxw = (((float)i + 0.5f) / grid - 0.5f) * W;   /* centro de celda */
+            float czw = (((float)j + 0.5f) / grid - 0.5f) * W;
+            float dx = cxw - wx, dz = czw - wz;
+            if (dx*dx + dz*dz <= radius * radius) {
+                unsigned char v = on ? 1 : 0;
+                if (m->terrain_holes[j * grid + i] != v) { m->terrain_holes[j * grid + i] = v; changed = 1; }
+            }
+        }
+    if (changed) terrain_rebuild_indices(m);
+    return changed;
+}
+
+/* Is there a hole at world (wx,wz)? (for placement/collision to skip holes). */
+int g3d_terrain_is_hole(G3DMesh *m, float wx, float wz) {
+    if (!terrain_valid(m) || !m->terrain_holes) return 0;
+    int side = m->terrain_side, grid = side - 1;
+    float gx, gz; world_to_grid(m, wx, wz, &gx, &gz);
+    int i = (int)floorf(gx), j = (int)floorf(gz);
+    if (i < 0 || i >= grid || j < 0 || j >= grid) return 0;
+    return m->terrain_holes[j * grid + i] ? 1 : 0;
+}
+
 /* ---- normals + GPU upload ---------------------------------------------- */
 
 static void terrain_recompute_normals(G3DMesh *m) {
@@ -111,6 +173,29 @@ void g3d_terrain_update(G3DMesh *m) {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 #endif
+}
+
+/* Load a per-vertex Y dump (uint32 count + count floats) written by the editor.
+   Applies the heights and refreshes normals/GPU. 0 if missing or count mismatch. */
+int g3d_terrain_load(G3DMesh *m, const char *path) {
+    if (!terrain_valid(m) || !path)
+        return 0;
+    FILE *f = fopen(path, "rb");
+    if (!f)
+        return 0;
+    unsigned int n = 0;
+    if (fread(&n, sizeof(unsigned int), 1, f) != 1 || n != m->vertex_count) {
+        fclose(f);
+        return 0;
+    }
+    for (unsigned int i = 0; i < n; i++) {
+        float y;
+        if (fread(&y, sizeof(float), 1, f) == 1)
+            m->vertices[i].position[1] = y;
+    }
+    fclose(f);
+    g3d_terrain_update(m);
+    return 1;
 }
 
 /* ---- single vertex edit ------------------------------------------------ */
