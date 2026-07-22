@@ -272,6 +272,15 @@ int64_t g3d_entity_set_scale_bgd(INSTANCE *my, int64_t *params) {
     return g3d_entity_impl_set_scale(entity_id, sx, sy, sz);
 }
 
+int64_t g3d_entity_get_rotation_bgd(INSTANCE *my, int64_t *params) {
+    float p = 0, y = 0, r = 0;
+    int ok = g3d_entity_impl_get_rotation((int)params[0], &p, &y, &r);
+    if (params[1]) *(float *)params[1] = G3D_RAD2MD(p);
+    if (params[2]) *(float *)params[2] = G3D_RAD2MD(y);
+    if (params[3]) *(float *)params[3] = G3D_RAD2MD(r);
+    return ok;
+}
+
 int64_t g3d_entity_get_position_bgd(INSTANCE *my, int64_t *params) {
     int entity_id = (int)params[0];
     float *x = (float *)params[1];

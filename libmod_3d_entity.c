@@ -133,6 +133,23 @@ int g3d_entity_impl_set_position(int entity_id, float x, float y, float z) {
     return 1;
 }
 
+/* Rotacion actual de la entidad en angulos de Euler (radianes), la inversa de
+   g3d_entity_impl_set_rotation. Permite a un anfitrion (o al main de un juego)
+   saber hacia donde mira un objeto sin tener que llevar la cuenta por su lado:
+   util, por ejemplo, para colgar un arma del hueso de un personaje al que mueve
+   otro codigo. */
+int g3d_entity_impl_get_rotation(int entity_id, float *pitch, float *yaw, float *roll) {
+    G3DEntity *entity = g3d_entity_impl_get(entity_id);
+    if (!entity)
+        return 0;
+    float p, y, r;
+    quat_to_euler(entity->rotation, &p, &y, &r);
+    if (pitch) *pitch = p;
+    if (yaw)   *yaw   = y;
+    if (roll)  *roll  = r;
+    return 1;
+}
+
 int g3d_entity_impl_set_rotation(int entity_id, float pitch, float yaw, float roll) {
     G3DEntity *entity = g3d_entity_impl_get(entity_id);
     if (!entity)

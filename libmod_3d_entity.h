@@ -108,6 +108,7 @@ G3DEntity *g3d_entity_impl_get(int entity_id);
 /* Transform */
 int g3d_entity_impl_set_position(int entity_id, float x, float y, float z);
 int g3d_entity_impl_set_rotation(int entity_id, float pitch, float yaw, float roll);
+int g3d_entity_impl_get_rotation(int entity_id, float *pitch, float *yaw, float *roll);
 int g3d_entity_impl_set_scale(int entity_id, float sx, float sy, float sz);
 int g3d_entity_impl_get_position(int entity_id, float *x, float *y, float *z);
 int g3d_entity_impl_set_parent(int entity_id, int parent_id);

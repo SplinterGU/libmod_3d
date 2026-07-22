@@ -68,6 +68,7 @@ int64_t g3d_entity_set_position_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_entity_set_rotation_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_entity_set_scale_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_entity_get_position_bgd(INSTANCE *my, int64_t *params);
+int64_t g3d_entity_get_rotation_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_entity_set_parent_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_entity_set_material_bgd(INSTANCE *my, int64_t *params);
 int64_t g3d_entity_set_alpha_bgd(INSTANCE *my, int64_t *params);
@@ -363,6 +364,7 @@ DLSYSFUNCS __bgdexport(libmod_3d, functions_exports)[] = {
     FUNC("G3D_ENTITY_SET_ROTATION", "IFFF", TYPE_INT, g3d_entity_set_rotation_bgd),
     FUNC("G3D_ENTITY_SET_SCALE", "IFFF", TYPE_INT, g3d_entity_set_scale_bgd),
     FUNC("G3D_ENTITY_GET_POSITION", "IPPP", TYPE_INT, g3d_entity_get_position_bgd),
+    FUNC("G3D_ENTITY_GET_ROTATION", "IPPP", TYPE_INT, g3d_entity_get_rotation_bgd),
     FUNC("G3D_ENTITY_SET_PARENT", "II", TYPE_INT, g3d_entity_set_parent_bgd),
     FUNC("G3D_CAMERA_CREATE", "", TYPE_INT, g3d_camera_create_bgd),
     FUNC("G3D_CAMERA_SET_ACTIVE", "I", TYPE_INT, g3d_camera_set_active_bgd),
