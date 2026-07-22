@@ -283,15 +283,26 @@ void g3d_rigidbody_step(float dt) {
 
 void g3d_rigidbody_apply_impulse(int id, float ix, float iy, float iz) {
     if (!jrb_ok(id)) return;
-    g_ps->GetBodyInterface().AddImpulse(g_rb[id].id, Vec3(ix, iy, iz));
+    /* Jolt duerme los cuerpos que se quedan quietos, y un cuerpo dormido IGNORA
+       los impulsos. Sin despertarlo, cosas como la flotacion no funcionaban: un
+       barril se hundia, se posaba en el fondo, se dormia y ya no habia empuje
+       que lo sacara. Si alguien aplica un impulso, espera que el cuerpo
+       reaccione. */
+    BodyInterface &bi = g_ps->GetBodyInterface();
+    bi.ActivateBody(g_rb[id].id);
+    bi.AddImpulse(g_rb[id].id, Vec3(ix, iy, iz));
 }
 void g3d_rigidbody_set_velocity(int id, float vx, float vy, float vz) {
     if (!jrb_ok(id)) return;
-    g_ps->GetBodyInterface().SetLinearVelocity(g_rb[id].id, Vec3(vx, vy, vz));
+    BodyInterface &bi = g_ps->GetBodyInterface();
+    bi.ActivateBody(g_rb[id].id);      /* un cuerpo dormido ignoraria la velocidad */
+    bi.SetLinearVelocity(g_rb[id].id, Vec3(vx, vy, vz));
 }
 void g3d_rigidbody_set_angular_velocity(int id, float wx, float wy, float wz) {
     if (!jrb_ok(id)) return;
-    g_ps->GetBodyInterface().SetAngularVelocity(g_rb[id].id, Vec3(wx, wy, wz));
+    BodyInterface &bi = g_ps->GetBodyInterface();
+    bi.ActivateBody(g_rb[id].id);      /* idem: si duerme, no haria caso */
+    bi.SetAngularVelocity(g_rb[id].id, Vec3(wx, wy, wz));
 }
 void g3d_rigidbody_set_bounce(int id, float restitution, float friction) {
     if (!jrb_ok(id)) return;
