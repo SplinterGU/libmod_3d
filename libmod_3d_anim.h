@@ -20,6 +20,12 @@ const char *g3d_model_animation_name(G3DModel *model, int i);
 /* Combined AABB of the model's meshes into out_min/out_max (float[3]). 1 = ok. */
 int g3d_model_bounds(G3DModel *model, float *out_min, float *out_max);
 
+/* Find a node/bone by case-insensitive substring of its name (-1 if none). */
+int g3d_model_node_find(G3DModel *model, const char *name);
+
+/* Animated model-space translation component (0=x,1=y,2=z) of a node/bone. */
+float g3d_model_node_axis(G3DModel *model, int node, int comp);
+
 /* Duration (seconds) of an animation, or 0. */
 float g3d_model_animation_duration(G3DModel *model, int anim);
 

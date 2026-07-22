@@ -25,6 +25,39 @@ const char *g3d_model_animation_name(G3DModel *model, int i) {
     return model->animations[i].name;
 }
 
+/* Find a node/bone by case-insensitive substring of its name (-1 if none).
+   Same match as the BennuGD2 G3D_MODEL_NODE_FIND, exposed for the editor's
+   live preview (weapon-in-hand) so it doesn't need the bgd layer. */
+int g3d_model_node_find(G3DModel *model, const char *name) {
+    if (!model || !model->node_name || !name) return -1;
+    for (int i = 0; i < model->node_count; i++) {
+        const char *a = model->node_name[i];
+        if (!a) continue;
+        for (const char *p = a; *p; p++) {              /* substring, case-insensitive */
+            const char *s = p, *q = name; int ok = 1;
+            while (*q) {
+                if (!*s) { ok = 0; break; }
+                int ca = *s, cb = *q;
+                if (ca >= 'A' && ca <= 'Z') ca += 32;
+                if (cb >= 'A' && cb <= 'Z') cb += 32;
+                if (ca != cb) { ok = 0; break; }
+                s++; q++;
+            }
+            if (ok) return i;
+        }
+    }
+    return -1;
+}
+
+/* Animated world-space translation component (0=x,1=y,2=z) of a node/bone in
+   MODEL space (node_global translation + skin_offset), updated by the last
+   g3d_model_animate. World = char_pos + Ry(facing) * (scale * this + offset). */
+float g3d_model_node_axis(G3DModel *model, int node, int comp) {
+    if (!model || !model->node_global || node < 0 || node >= model->node_count ||
+        comp < 0 || comp > 2) return 0.0f;
+    return model->node_global[node].m[12 + comp] + model->skin_offset[comp];
+}
+
 /* Combined AABB of all the model's meshes (out_min/out_max are float[3]).
    Returns 1 on success. Lets the editor frame a model in a preview camera. */
 int g3d_model_bounds(G3DModel *model, float *out_min, float *out_max) {
